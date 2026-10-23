@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: yatrakavach
+      POSTGRES_USER: yk
+      POSTGRES_PASSWORD: yk_dev_only   # local demo only; never use in production
+    ports: ["5432:5432"]
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yk -d yatrakavach"]
+      interval: 3s
+      retries: 20
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://yk:yk_dev_only@db:5432/yatrakavach
+    ports: ["8000:8000"]
+    volumes:
+      - ./data:/app/data:ro
+      - ./config:/app/config:ro
+      - ./frontend:/app/frontend:ro
+    depends_on:
+      db: {condition: service_healthy}
