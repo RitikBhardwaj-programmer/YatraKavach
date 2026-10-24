@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 .env
 data/raw/
+
+# graphify knowledge graph (rebuilt by git hooks)
+graphify-out/
