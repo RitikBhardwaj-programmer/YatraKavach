@@ -98,7 +98,7 @@ def test_full_red_flow_two_officers_cap_and_audit(c):
 
     # A second run proposes nothing new.
     again = service.propose_from_risk(c, "replay", "test_source", T0, T0 + timedelta(hours=1))
-    assert again == {"proposed": [], "withdrawn": []}
+    assert again == {"proposed": [], "withdrawn": [], "extended": []}
 
     a = service.act(c, red["id"], "approve", "off-1")
     assert a["state"] == "PROPOSED" and [x["officer"] for x in a["approvals"]] == ["off-1"]
@@ -149,7 +149,7 @@ def test_pending_proposal_withdrawn_when_risk_clears(c):
     _hazard(c, {"VD-OLD-04": 1}, T0 + timedelta(hours=1))
     risk_service.run_risk(c, "replay", T0, T0 + timedelta(hours=1), "test_source")
     out = service.propose_from_risk(c, "replay", "test_source", T0, T0 + timedelta(hours=1))
-    assert out == {"proposed": [], "withdrawn": [alert["id"]]}
+    assert out == {"proposed": [], "withdrawn": [alert["id"]], "extended": []}
     assert service.get_alert(c, alert["id"])["state"] == "CANCELLED"
     row = service.audit_rows(c, alert["id"])[-1]
     assert (row["action"], row["actor"], row["to_state"]) == ("WITHDRAW", "system", "CANCELLED")

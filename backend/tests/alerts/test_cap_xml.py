@@ -97,6 +97,20 @@ def test_cancel_references_original():
     assert text(root.find("cap:info", NS), "cap:responseType") == "AllClear"
 
 
+def test_cancel_is_sent_at_cancel_time_and_references_original_send():
+    sent_at, cancelled_at = T0 + timedelta(minutes=3), T0 + timedelta(hours=1)
+    a = cap.CapInput(7, "replay", 3, "CANCELLED", SEGS, "x", T0, sent_at, T0 + timedelta(hours=3), None, cancelled_at)
+    root = ET.fromstring(cap.build(a, templates.context(TOPO, SEGS), cap.area_polygon(LINES)))
+    assert text(root, "cap:sent") == cap.cap_time(cancelled_at)
+    assert text(root, "cap:references").endswith("," + cap.cap_time(sent_at))
+
+
+def test_cancel_of_never_sent_alert_is_refused():
+    a = cap.CapInput(7, "replay", 3, "CANCELLED", SEGS, "x", T0, None, None, None, T0)
+    with pytest.raises(ValueError):
+        cap.build(a, templates.context(TOPO, SEGS), cap.area_polygon(LINES))
+
+
 @pytest.mark.parametrize("lang", templates.LANGUAGES)
 def test_templates_have_both_levels_and_cancel(lang):
     t = templates.load(lang)["cap"]

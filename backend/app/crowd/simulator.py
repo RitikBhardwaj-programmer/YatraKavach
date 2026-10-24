@@ -67,10 +67,13 @@ def _choose_track(rng: random.Random, p: SimParams, tracks: list[str]) -> str:
     return old if rng.random() < p.p_old_track else rng.choice(others)
 
 
-def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimParams()) -> dict[tuple[str, datetime], int]:
+def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimParams(),
+             up_arrivals: dict[tuple[str, str], list[int]] | None = None) -> dict[tuple[str, datetime], int]:
     """Persons on each segment at each whole hour in [start, end] (inclusive). Deterministic for a seed.
 
     Pilgrims who entered on the previous day and are still walking are included.
+    `up_arrivals`, if given with keys (leaf route, segment id), is filled with the number of ascending pilgrims
+    on that leaf route who reach the start of that segment in each hour (input for the holding scenario).
     """
     if p.daily_arrivals > p.daily_cap:
         raise ValueError("daily_arrivals must not exceed the daily cap")
@@ -85,6 +88,20 @@ def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimP
     down = {t: _path(topo.ascent_path(t)[::-1]) for t in tracks}
     counts = {sid: [0] * n_hours for sid in topo.by_id}
     weights = hourly_weights(p)
+    # distance from the path start to the start of each watched segment, per leaf route
+    watch: dict[str, list[tuple[str, float]]] = {}
+    for (leaf, sid) in (up_arrivals or {}):
+        path = up[leaf]
+        if sid in path.ids:
+            i = path.ids.index(sid)
+            watch.setdefault(leaf, []).append((sid, path.cum_m[i - 1] if i else 0.0))
+        up_arrivals[(leaf, sid)][:] = [0] * n_hours
+
+    def mark_arrivals(leaf: str, t_start: float, speed_mph: float) -> None:
+        for sid, dist in watch.get(leaf, ()):
+            k = math.floor(t_start + dist / speed_mph)
+            if 0 <= k < n_hours:
+                up_arrivals[(leaf, sid)][k] += 1
 
     def add(path: _Path, t_start: float, speed_mph: float) -> None:
         k = max(0, math.ceil(t_start))
@@ -103,20 +120,77 @@ def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimP
             speed = rng.uniform(*p.speed_kmh) * 1000.0
             up_track, down_track = _choose_track(rng, p, tracks), _choose_track(rng, p, tracks)
             add(up[up_track], t0, speed)
+            mark_arrivals(up_track, t0, speed)
             add(down[down_track], t0 + up[up_track].length_m / speed + rng.uniform(*p.dwell_h), speed)
         day += timedelta(days=1)
 
     return {(sid, t_first + timedelta(hours=k)): c[k] for sid, c in counts.items() for k in range(n_hours)}
 
 
+@dataclass(frozen=True)
+class HoldingParams:
+    """SIMULATED holding-area scenario (config/thresholds.yaml crowd.holding)."""
+    points: tuple[str, ...]        # segments where pilgrims can be held, ascent order (gate first)
+    hold_at_hazard_level: int      # ascent is stopped below the first segment at or above this hazard level
+    release_per_hour: int          # SIMULATED rate at which a held queue moves on after the hold ends
+    max_held_persons: int          # SIMULATED cap: registrations are assumed suspended beyond it
+
+
+def hold_points(topo: Topology, hazard: dict[str, int], hp: HoldingParams) -> dict[str, str]:
+    """Per leaf route: the holding point where ascent stops this hour, or no entry when nothing is held.
+
+    The hold is the nearest holding point below the first segment (in ascent order) whose hazard level is at
+    least `hold_at_hazard_level`. If that segment is the gate segment itself, pilgrims are held at the gate.
+    """
+    out: dict[str, str] = {}
+    for leaf in topo.leaf_routes():
+        path = [s.id for s in topo.ascent_path(leaf)]
+        idx = next((i for i, sid in enumerate(path) if hazard.get(sid, 0) >= hp.hold_at_hazard_level), None)
+        if idx is None:
+            continue
+        below = [sid for sid in path[:idx] if sid in hp.points]
+        gate = next((sid for sid in path if sid in hp.points), None)
+        hold = below[-1] if below else gate
+        if hold is not None:
+            out[leaf] = hold
+    return out
+
+
+def apply_holding(occupancy: dict[tuple[str, datetime], int], times: list[datetime],
+                  holds: list[dict[str, str]], up_arrivals: dict[tuple[str, str], list[int]],
+                  hp: HoldingParams) -> dict[tuple[str, datetime], dict]:
+    """Add held queues to the holding segments (SIMULATED). Returns {(segment, ts): scenario note}.
+
+    While a leaf route is held at H, its ascending pilgrims who reach H join the queue at H. When no route is
+    held at H any more, the queue moves on at `release_per_hour`. Simplification (stated in the README): the
+    base flow beyond a hold is not reduced, so exposure above the hold is overstated, not understated.
+    """
+    queue: dict[str, int] = {h: 0 for h in hp.points}
+    notes: dict[tuple[str, datetime], dict] = {}
+    for k, ts in enumerate(times):
+        active = holds[k]
+        for leaf, h in active.items():
+            queue[h] = min(hp.max_held_persons, queue[h] + up_arrivals.get((leaf, h), [0] * len(times))[k])
+        for h in hp.points:
+            held_routes = sorted(leaf for leaf, x in active.items() if x == h)
+            if not held_routes:
+                queue[h] = max(0, queue[h] - hp.release_per_hour)
+            if queue[h]:
+                occupancy[(h, ts)] = occupancy.get((h, ts), 0) + queue[h]
+                notes[(h, ts)] = {"scenario": "HOLDING_AREA", "held_persons": queue[h],
+                                  "held_routes": held_routes, "releasing": not held_routes}
+    return notes
+
+
 def crowd_rows(topo: Topology, occupancy: dict[tuple[str, datetime], int], mode: str,
-               bands: list[float]) -> list[dict]:
-    """`segment_crowd` rows; always `simulated = True`."""
+               bands: list[float], notes: dict[tuple[str, datetime], dict] | None = None) -> list[dict]:
+    """`segment_crowd` rows; always `simulated = True`. `scenario` holds the holding-area note, if any."""
     rows = []
     for (sid, ts), persons in sorted(occupancy.items(), key=lambda kv: (kv[0][1], kv[0][0])):
         seg = topo.by_id[sid]
         density = persons / (seg.length_m * seg.width_m)
         rows.append({"segment_id": sid, "ts": ts, "mode": mode, "persons": persons,
-                     "density_ppm2": round(density, 4), "level": density_level(density, bands), "simulated": True})
+                     "density_ppm2": round(density, 4), "level": density_level(density, bands), "simulated": True,
+                     "scenario": (notes or {}).get((sid, ts))})
     return rows
 

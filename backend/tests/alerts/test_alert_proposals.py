@@ -14,9 +14,14 @@ def risk(levels: dict[str, int]) -> dict[str, dict]:
     return {sid: {"risk_level": levels.get(sid, 0), "drivers": {}} for sid in TOPO.by_id}
 
 
-def test_contiguous_segments_form_one_alert_per_route_and_level():
-    out, _ = propose(TOPO, {T0: risk({"VD-OLD-01": 2, "VD-OLD-02": 2, "VD-OLD-04": 2, "VD-HIMKOTI-01": 3})}, [], 2)
-    assert sorted(p.segment_ids for p in out) == [["VD-HIMKOTI-01"], ["VD-OLD-01", "VD-OLD-02"], ["VD-OLD-04"]]
+def test_segments_form_one_alert_per_route_and_level():
+    # Non-contiguous stretches of one route at one level are one alert (limits alert fatigue).
+    out, _ = propose(TOPO, {T0: risk({"VD-OLD-01": 2, "VD-OLD-02": 2, "VD-OLD-04": 2, "VD-OLD-06": 3,
+                                      "VD-HIMKOTI-01": 3})}, [], 2)
+    assert sorted(p.segment_ids for p in out) == [["VD-HIMKOTI-01"], ["VD-OLD-01", "VD-OLD-02", "VD-OLD-04"],
+                                                  ["VD-OLD-06"]]
+    old = next(p for p in out if p.segment_ids[0] == "VD-OLD-01")
+    assert templates.segment_label(TOPO, old.segment_ids) == "VD-OLD-01 to VD-OLD-02, VD-OLD-04"
 
 
 def test_below_proposal_level_gives_nothing():
@@ -79,3 +84,23 @@ def test_context_uses_landmark_inside_run_and_root_fallback():
     assert ctx["place"] == ctx["nearby"] == "Katra (Banganga Road start)"
     assert ctx["upstream"] == "Katra (Banganga Road start)"
     assert ctx["segments"] == "VD-TRUNK-01 to VD-TRUNK-02"
+
+
+def test_pending_alert_grows_instead_of_a_second_alert_on_the_same_route_and_level():
+    timeline = {T0: risk({"VD-OLD-01": 2}), T0 + H: risk({"VD-OLD-01": 2, "VD-OLD-05": 2})}
+    out, _ = propose(TOPO, timeline, [], 2)
+    assert len(out) == 1 and out[0].segment_ids == ["VD-OLD-01", "VD-OLD-05"]
+    assert "VD-OLD-01" in out[0].proposed_action
+
+
+def test_approved_alert_does_not_grow():
+    stored = [OpenAlert(1, ["VD-OLD-01"], 2, T0 - H, extendable=False)]
+    out, _ = propose(TOPO, {T0: risk({"VD-OLD-01": 2, "VD-OLD-05": 2})}, stored, 2)
+    assert [p.segment_ids for p in out] == [["VD-OLD-05"]] and stored[0].extended == []
+
+
+def test_stored_pending_alert_records_its_growth():
+    stored = [OpenAlert(1, ["VD-OLD-01"], 2, T0 - H)]
+    out, _ = propose(TOPO, {T0: risk({"VD-OLD-01": 2, "VD-OLD-05": 2})}, stored, 2)
+    assert out == [] and stored[0].segment_ids == ["VD-OLD-01", "VD-OLD-05"]
+    assert stored[0].extended == [(T0, ["VD-OLD-05"])]

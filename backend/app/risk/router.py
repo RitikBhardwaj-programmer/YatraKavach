@@ -57,7 +57,7 @@ def replay_run(source: str = DEFAULT_REPLAY_SOURCE, until: datetime | None = Non
     clock = min(end, _at(until)) if until else end
     hazard = [run_hazard("replay", s, start, end) for s in sources]
     with db.conn() as c:
-        crowd_rows = run_crowd(c, "replay", start, end)
+        crowd_rows = run_crowd(c, "replay", start, end, hazard_source=source)
         risk_rows = service.run_risk(c, "replay", start, end)
         alerts = propose_from_risk(c, "replay", source, start, clock)
     return ist({"start": start, "end": end, "until": clock, "hazard": hazard, "crowd_rows": crowd_rows, "crowd_simulated": True,

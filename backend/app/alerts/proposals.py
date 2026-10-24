@@ -4,7 +4,9 @@ Walks the risk timeline hour by hour. An alert (in any state) covers its segment
 the risk on all of its segments falls below the alert's own level ("the condition cleared"): a RED proposal
 is stale once the segments are back to ORANGE, and an ORANGE alert below ORANGE.
 A segment needs a new alert when its risk >= `alerts.propose_at_risk_level` and no covering alert has the same or a higher level.
-Contiguous segments of one route at the same level form one alert. A RED proposal over a segment covered by an
+All segments of one route at the same level form one alert (one alert per track and level, to limit alert fatigue).
+While that alert is still pending and nobody has approved it, later segments of the same route and level join it
+(`extended`) instead of starting another alert; once an officer approved it, a new alert is proposed. A RED proposal over a segment covered by an
 ORANGE alert references that alert (CAP Update once it was sent).
 
 Because coverage is computed from `trigger_ts`, the walk is replay-safe (replay time, not wall-clock time) and
@@ -25,6 +27,8 @@ class OpenAlert:
     level: int
     trigger_ts: datetime
     cleared_at: datetime | None = None
+    extendable: bool = True            # pending and nobody approved yet: new segments of its route+level join it
+    extended: list[tuple[datetime, list[str]]] = field(default_factory=list)   # (hour, segments added) this walk
 
 
 @dataclass
@@ -47,18 +51,14 @@ def _covering(active: list[OpenAlert], segment_id: str) -> list[OpenAlert]:
 
 
 def _runs(topo: Topology, levels: dict[str, int], needs: set[str]) -> list[list[str]]:
+    """One group per route and level (segments in ascent order), so officers get one alert per track, not per stretch."""
     runs: list[list[str]] = []
     for segs in topo.routes.values():
-        current: list[str] = []
+        by_level: dict[int, list[str]] = {}
         for s in segs:
-            if s.id in needs and current and levels[current[-1]] == levels[s.id]:
-                current.append(s.id)
-                continue
-            if current:
-                runs.append(current)
-            current = [s.id] if s.id in needs else []
-        if current:
-            runs.append(current)
+            if s.id in needs:
+                by_level.setdefault(levels[s.id], []).append(s.id)
+        runs.extend(by_level[lvl] for lvl in sorted(by_level, reverse=True))
     return runs
 
 
@@ -86,10 +86,20 @@ def propose(topo: Topology, risk_at: dict[datetime, dict[str, dict[str, Any]]], 
                  and not any(a.level >= lvl for a in _covering(active, sid))}
         for run in _runs(topo, levels, needs):
             level = levels[run[0]]
+            route = topo.by_id[run[0]].route_id
+            target = next((a for a in active if a.extendable and a.level == level
+                           and topo.by_id[a.segment_ids[0]].route_id == route), None)
+            if target is not None:   # one pending alert per route and level: grow it instead of adding another
+                target.segment_ids[:] = sorted({*target.segment_ids, *run}, key=lambda s: topo.by_id[s].seq)
+                target.extended.append((ts, run))
+                continue
             lower = [a for a in _covering(active, run[0]) if a.level < level]
-            ctx = templates.context(topo, run)
-            new = OpenAlert(None, run, level, ts)
-            out.append(Proposal(run, level, ts, templates.officer_action(level, ctx), lower[-1] if lower else None,
-                                new, {"trigger_ts": ts.isoformat(), "risk": {sid: rows[sid] for sid in run}}))
+            new = OpenAlert(None, list(run), level, ts)
+            out.append(Proposal(new.segment_ids, level, ts, templates.officer_action(level, templates.context(topo, run)),
+                                lower[-1] if lower else None, new,
+                                {"trigger_ts": ts.isoformat(), "risk": {sid: rows[sid] for sid in run}}))
             alerts.append(new)
+            active.append(new)
+    for p in out:   # text for the final segment set, after any growth during the walk
+        p.proposed_action = templates.officer_action(p.level, templates.context(topo, p.segment_ids))
     return out, cleared

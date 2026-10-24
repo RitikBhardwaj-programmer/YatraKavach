@@ -29,6 +29,23 @@ Thresholds (sourced: Shah et al. 2024 for NH-44; Dahal & Hasegawa 2008 for the H
 - The models are 9-25 km grids. They show a very wet day over the whole area, not the exact slope.
   The replay proves "the signal existed in time", not "the model predicts landslides".
 
+## System result (measured 2026-10-24, thresholds version 2026-10-24.1)
+Full replay through the API (`POST /api/replay/run?until=2025-08-26T14:00+05:30`), segment `VD-OLD-01`
+(old track at Adhkuwari). The past slide on this segment is dated 14:40, so it does not raise these levels.
+
+| Source | First ORANGE (25-26 Aug storm) | First RED | Lead time of RED before 14:40 |
+|---|---|---|---|
+| GFS (historical forecast) | 25 Aug 15:00 IST | 26 Aug 05:00 IST | about 9.5 h |
+| ECMWF IFS (historical forecast) | 26 Aug 02:00 IST | 26 Aug 13:00 IST | about 1.5 h |
+| ERA5 (reanalysis, not real-time) | 26 Aug 01:00 IST | 26 Aug 13:00 IST | about 1.5 h |
+
+- Alerts (GFS): at 26 Aug 14:00 there are 6 open proposals, one per track and level (old track, Himkoti
+  track, trunk; ORANGE and RED). Earlier storms (11-24 Aug) produced 22 proposals, all withdrawn by the system
+  when the risk cleared before anyone acted.
+- SIMULATED holding-area scenario: with ascent stopped at the Katra gate from 25 Aug evening, the held queue
+  reaches the 15,000 cap by about 06:00 on 26 Aug: 5.4 persons/m2 on segment `VD-TRUNK-01` (crowd ORANGE),
+  inside a segment whose own hazard is RED. Closing the track moves the risk to the people held below it.
+
 ## Not done
 - Machail / Chasoti (14 Aug 2025): OpenStreetMap has no trek line past the road end (about 33.338 N,
   76.207 E), and the Chasoti point is not in OSM. Overpass was failing (HTTP 502 / timeouts) on 2026-10-23.

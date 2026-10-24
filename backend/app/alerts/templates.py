@@ -27,12 +27,24 @@ def context(topo: Topology, segment_ids: list[str]) -> dict[str, str]:
     root = topo.ascent_path(topo.by_id[first].route_id)[0]
     upstream = below.landmark if below else topo.label(root.id)
     return {
-        "segments": first if len(segment_ids) == 1 else f"{first} to {segment_ids[-1]}",
+        "segments": segment_label(topo, segment_ids),
         "place": named or first,
         "nearby": named or upstream,
         "upstream": upstream,
         "shelter": upstream,
     }
+
+
+def segment_label(topo: Topology, segment_ids: list[str]) -> str:
+    """"A", "A to C" or "A to C, F" for the contiguous stretches of a group of segments on one route."""
+    stretches: list[list[str]] = []
+    for sid in segment_ids:
+        prev = stretches[-1][-1] if stretches else None
+        if prev and topo.by_id[sid].seq == topo.by_id[prev].seq + 1 and topo.by_id[sid].route_id == topo.by_id[prev].route_id:
+            stretches[-1].append(sid)
+        else:
+            stretches.append([sid])
+    return ", ".join(s[0] if len(s) == 1 else f"{s[0]} to {s[-1]}" for s in stretches)
 
 
 def officer_action(level: int, ctx: dict[str, str]) -> str:

@@ -132,3 +132,17 @@ def test_edit_rules():
         wf.edit(partly, OFF2, T0, "new text")
     new, events = wf.edit(alert(2), OFF1, T0, " Hold at Banganga ")
     assert new.proposed_action == "Hold at Banganga" and events[0].detail["after"] == "Hold at Banganga"
+
+
+def test_withdraw_keeps_an_alert_with_a_partial_approval():
+    # RED needs two officers; after one approval the system must not silently drop it.
+    a, _ = wf.approve(alert(level=3), OFF1, T0, RULES)
+    assert a.state == State.PROPOSED and a.approvals == ("off-1",)
+    with pytest.raises(WorkflowError):
+        wf.withdraw(a, T0, "risk cleared")
+
+
+def test_escalation_counts_from_the_last_officer_action():
+    a = alert(level=3, approvals=("off-1",), last_action_at=T0 + timedelta(minutes=8))
+    assert wf.tick(a, T0 + RULES.escalate_after, RULES)[0].state == State.PROPOSED
+    assert wf.tick(a, T0 + timedelta(minutes=8) + RULES.escalate_after, RULES)[0].state == State.ESCALATED
