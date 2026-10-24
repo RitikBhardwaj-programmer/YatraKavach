@@ -11,6 +11,8 @@ IIT Bombay). Theme 11: Disaster Mitigation & Resilience. Team **kavach**, Jammu 
 > In a replay of the rain forecasts of that day, YatraKavach raises the Adhkuwari segment to **RED at 05:00 IST**
 > (GFS forecast), about 9.5 hours before the slide, and proposes "clear the old track" for officer approval.
 > With the ECMWF forecast the lead time is about 1.5 hours. Details: [docs/replay-findings.md](docs/replay-findings.md).
+> In a SIMULATED crowd, a hold approved at the first ORANGE warning leaves **0** pilgrims on that segment at 14:00,
+> in all three weather models; with no action there are **674**.
 
 ## The problem
 Three recent yatra disasters in J&K show the same break (sources in [docs/research.md](docs/research.md)):
@@ -42,6 +44,12 @@ from "regional alert" to **"close this 500 m stretch now, move the people on it,
 6. **Sends a CAP 1.2 alert** (Common Alerting Protocol, the format NDMA SACHET uses) in English, Hindi and Urdu,
    with the affected area as a polygon. In this prototype every message is `status=Exercise` and delivery is SIMULATED.
 7. **Replays August 2025** hour by hour, so anyone can check what the system would have proposed and when.
+8. **Shows the cost of waiting** (SIMULATED): for each warning time, how many pilgrims would still have been on
+   the slide segment if officers had approved the hold then (`GET /api/impact/counterfactual`).
+9. **Counts people from a camera image** with an AI model (DM-Count, run on CPU with ONNX Runtime). A camera
+   watches one segment; the count becomes a crowd density and level, and in LIVE mode an officer can apply it to
+   the live crowd instead of the simulated value. The demo uses openly licensed festival photos, not Vaishno Devi
+   cameras, and the console says so.
 
 ## Architecture
 
@@ -74,6 +82,8 @@ flowchart LR
 | Crowd simulator, holding scenario | `backend/app/crowd/` | Everything here is SIMULATED and labelled so |
 | Risk fusion, segments API, replay | `backend/app/risk/` | `POST /api/replay/run` recomputes the whole chain |
 | Alert workflow, CAP, audit | `backend/app/alerts/` | State machine is pure Python; DB layer locks and audits |
+| Impact counterfactual | `backend/app/impact/` | Re-runs the SIMULATED crowd with the ascent stopped at each decision time |
+| Camera crowd count | `backend/app/vision/` | DM-Count ONNX model (43 MB, sha256-checked), heatmap, demo photos |
 | Officer console | `frontend/` | Static HTML + MapLibre GL, no build step |
 | Schema | `db/init/*.sql` | PostgreSQL 16 + PostGIS 3 |
 | Contract and design | `docs/PLAN.md` | Schema, rules, API, workflow |
@@ -113,8 +123,8 @@ cd backend
 pip install -r requirements.txt
 DATABASE_URL=postgresql://yk:yk_dev_only@localhost:5432/yatrakavach pytest
 ```
-197 tests (measured 2026-10-24). Pure-logic tests run without a database; database tests skip with a message when
-none is reachable. Use the port you gave `YK_DB_PORT`.
+254 tests pass in the Docker image on a fresh database (measured 2026-10-24). Pure-logic tests run without a
+database; database tests skip with a message when none is reachable. Use the port you gave `YK_DB_PORT`.
 
 ## Data sources and licences
 - Tracks: © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/).
@@ -124,6 +134,12 @@ none is reachable. Use the port you gave `YK_DB_PORT`.
 - Thresholds: Shah et al. 2024 (NH-44 / Kashmir daily and antecedent rain), Dahal & Hasegawa 2008 (Nepal
   Himalaya intensity-duration curve, 144 mm/day). Full list with links in [docs/research.md](docs/research.md).
 - How the data files were made: `scripts/build_segments.py`, `scripts/fetch_replay_rain.py`.
+- Crowd-count model: [DM-Count](https://github.com/cvlab-stonybrook/DM-Count) (Wang et al., NeurIPS 2020), MIT
+  licence, official ShanghaiTech A weights, exported to ONNX by `scripts/export_dmcount_onnx.py`.
+  Measured MAE 60.10 on the ShanghaiTech Part A test set (`scripts/eval_vision.py`).
+- Demo photos: Wikimedia Commons, CC BY 4.0 / CC BY 2.5 / CC BY-SA 4.0; authors and links in
+  [backend/app/vision/samples/ATTRIBUTION.md](backend/app/vision/samples/ATTRIBUTION.md). Resized copies of the
+  CC BY-SA photos stay under CC BY-SA 4.0.
 
 ## Limitations (read before judging the numbers)
 - **Thresholds are not calibrated for these tracks.** They come from studies of NH-44 and the Nepal Himalaya.
@@ -137,6 +153,12 @@ none is reachable. Use the port you gave `YK_DB_PORT`.
 - **Lead time depends on the model:** about 9.5 h with GFS, about 1.5 h with ECMWF and ERA5 on 26 Aug 2025.
 - **Crowd numbers are SIMULATED.** No RFID or CCTV feed was used. The holding-area queue is a scenario with
   assumed sites, capacity and release rate. It does not reduce the flow above a hold, so exposure there is overstated.
+- **The impact numbers are SIMULATED.** They show the effect of decision timing in the crowd model, not real
+  head counts. Only the ascent is stopped; pilgrims already above the hold keep walking.
+- **The camera count is a demo.** No Vaishno Devi camera feed was used. The ground area a camera sees
+  (150 m²) is an assumed value, so the density from a demo photo is illustrative. The model's average error on
+  dense test crowds is about 60 people per image. One count takes 2-5 s on CPU. In LIVE mode the next simulated
+  crowd run can overwrite an applied camera count.
 - **No GSI susceptibility layer.** The GSI 1:50k map could not be obtained in time; slope is the stand-in.
 - **Delivery is SIMULATED.** No SMS, SACHET, cell broadcast or siren is triggered. CAP messages are `Exercise`.
 - **Hindi and Urdu texts need review by native speakers.** Dogri and Kashmiri are not done yet.
@@ -153,7 +175,8 @@ It does not build its own sensors or alert network.
 The HSC 2027 rules ask for a disclosure of AI use and an estimate of its share.
 
 - **Tool:** Claude Code (Anthropic, model Claude Opus 5.5), used as a coding and research agent, including
-  parallel agent sessions for the hazard engine, the alert workflow and the console.
+  parallel agent sessions for the hazard engine, the alert workflow, the console, the impact counterfactual and
+  the camera crowd count. The crowd-count model itself (DM-Count) is published research, not generated.
 - **What AI did:** web research and the sourced research report; most of the source code, tests and
   documentation; an independent code review that found the replay-hindsight bug and the alert flood.
 - **What the team did:** chose the problem and the J&K focus; set the requirements and constraints; approved every

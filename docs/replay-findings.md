@@ -46,6 +46,37 @@ Full replay through the API (`POST /api/replay/run?until=2025-08-26T14:00+05:30`
   reaches the 15,000 cap by about 06:00 on 26 Aug: 5.4 persons/m2 on segment `VD-TRUNK-01` (crowd ORANGE),
   inside a segment whose own hazard is RED. Closing the track moves the risk to the people held below it.
 
+## Impact counterfactual (measured 2026-10-24, thresholds version 2026-10-24.2; all persons SIMULATED)
+`GET /api/impact/counterfactual` on a fresh database after the replay to 26 Aug 14:00. Persons on `VD-OLD-01`
+at 14:00, the last whole hour before the 14:40 slide, if officers had approved the hold at each time:
+
+| Hold approved at | GFS | ECMWF IFS | ERA5 |
+|---|---|---|---|
+| First ORANGE of the 25-26 Aug storm | **0** (25 Aug 15:00) | **0** (26 Aug 02:00) | **0** (26 Aug 01:00) |
+| First RED | **93** (26 Aug 05:00) | 674 (26 Aug 13:00) | 674 (26 Aug 13:00) |
+| Shrine board closure (~12:00, approximate) | 674 | 674 | 674 |
+| No action | 674 | 674 | 674 |
+
+- In every case the hold point is the Katra gate (`VD-TRUNK-01`), because the trunk itself is ORANGE/RED. The gate
+  is 6.3 km below `VD-OLD-01`: anyone there at 14:00 passed the gate before about 11:53, so a later hold cannot
+  change that count. Only the ascent is stopped; pilgrims already above the hold keep walking.
+- 674 = 438 ascending + 236 descending, checked by an independent re-implementation (PR 9). If the 12:00 closure
+  is modelled at Adhkuwari (`VD-TRUNK-13`) instead of the gate, 236 remain (descending only); not in the API.
+- "First ORANGE/RED" = first hour of the warning still in force at the snapshot. A storm on 14-15 Aug also took
+  `VD-OLD-01` to ORANGE; that warning had cleared and is not counted.
+- What it means (inference): acting on the ORANGE warning would have emptied the slide segment in all three
+  weather models; acting on the GFS RED would have cut exposure from 674 to 93. Acting at the time the track was
+  actually closed changes nothing in this model.
+
+## Camera crowd count (measured 2026-10-24)
+- Model: DM-Count (MIT), official ShanghaiTech A weights, ONNX fp16, 43.0 MB, sha256 pinned in
+  `config/thresholds.yaml`. ONNX matches torch exactly on two images; fp16 is within 0.03% of fp32 (PR 10).
+- Accuracy on the 182 ShanghaiTech Part A test images: **MAE 60.10** (fp16), 60.09 (fp32), RMSE 96.16 (PR 10).
+  The DM-Count paper reports 59.7.
+- Demo photos through `POST /api/vision/count` in the Docker image (Python 3.12, CPU): Kumbh 2019: 340 people,
+  4.3 s; Kumbh 2025: 65, 1.9 s; Ganesh Visarjan 2025: 746, 4.1 s; Rath Yatra 2007: 716, 4.9 s (model time).
+  The whole request takes 3-8 s, because the heatmap is returned as a 0.6-2.5 MB PNG.
+
 ## Not done
 - Machail / Chasoti (14 Aug 2025): OpenStreetMap has no trek line past the road end (about 33.338 N,
   76.207 E), and the Chasoti point is not in OSM. Overpass was failing (HTTP 502 / timeouts) on 2026-10-23.
