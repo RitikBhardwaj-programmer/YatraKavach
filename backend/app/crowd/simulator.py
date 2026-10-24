@@ -68,12 +68,16 @@ def _choose_track(rng: random.Random, p: SimParams, tracks: list[str]) -> str:
 
 
 def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimParams(),
-             up_arrivals: dict[tuple[str, str], list[int]] | None = None) -> dict[tuple[str, datetime], int]:
+             up_arrivals: dict[tuple[str, str], list[int]] | None = None,
+             stop_ascent: dict[str, tuple[str, datetime]] | None = None) -> dict[tuple[str, datetime], int]:
     """Persons on each segment at each whole hour in [start, end] (inclusive). Deterministic for a seed.
 
     Pilgrims who entered on the previous day and are still walking are included.
     `up_arrivals`, if given with keys (leaf route, segment id), is filled with the number of ascending pilgrims
     on that leaf route who reach the start of that segment in each hour (input for the holding scenario).
+    `stop_ascent` = {leaf route: (hold segment id, from_ts)} (impact counterfactual): an ascending pilgrim on that
+    leaf route who reaches the start of the hold segment at or after `from_ts` stays on the hold segment for the
+    rest of the window (not counted above it, no descent). Pilgrims who passed the hold point earlier are unchanged.
     """
     if p.daily_arrivals > p.daily_cap:
         raise ValueError("daily_arrivals must not exceed the daily cap")
@@ -96,16 +100,26 @@ def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimP
             i = path.ids.index(sid)
             watch.setdefault(leaf, []).append((sid, path.cum_m[i - 1] if i else 0.0))
         up_arrivals[(leaf, sid)][:] = [0] * n_hours
+    # per held leaf route: hold segment, distance to its start, hold time in hours from t_first
+    holds: dict[str, tuple[str, float, float]] = {}
+    for leaf, (sid, from_ts) in (stop_ascent or {}).items():
+        if leaf not in up or sid not in up[leaf].ids:
+            raise ValueError(f"stop_ascent: {sid} is not on the ascent path of {leaf}")
+        i = up[leaf].ids.index(sid)
+        holds[leaf] = (sid, up[leaf].cum_m[i - 1] if i else 0.0, (from_ts - t_first).total_seconds() / 3600)
 
-    def mark_arrivals(leaf: str, t_start: float, speed_mph: float) -> None:
+
+    def mark_arrivals(leaf: str, t_start: float, speed_mph: float, max_dist: float = math.inf) -> None:
         for sid, dist in watch.get(leaf, ()):
+            if dist > max_dist:
+                continue
             k = math.floor(t_start + dist / speed_mph)
             if 0 <= k < n_hours:
                 up_arrivals[(leaf, sid)][k] += 1
 
-    def add(path: _Path, t_start: float, speed_mph: float) -> None:
+    def add(path: _Path, t_start: float, speed_mph: float, t_stop: float = math.inf) -> None:
         k = max(0, math.ceil(t_start))
-        t_end = t_start + path.length_m / speed_mph
+        t_end = min(t_start + path.length_m / speed_mph, t_stop)
         while k < n_hours and k < t_end:
             i = bisect_right(path.cum_m, (k - t_start) * speed_mph)
             counts[path.ids[min(i, len(path.ids) - 1)]][k] += 1
@@ -119,9 +133,19 @@ def simulate(topo: Topology, start: datetime, end: datetime, p: SimParams = SimP
             t0 = day_offset_h + hour + rng.random()
             speed = rng.uniform(*p.speed_kmh) * 1000.0
             up_track, down_track = _choose_track(rng, p, tracks), _choose_track(rng, p, tracks)
+            dwell = rng.uniform(*p.dwell_h)  # drawn for every pilgrim, so a hold never shifts the random stream
+            hold = holds.get(up_track)
+            if hold and t0 + hold[1] / speed >= hold[2]:
+                sid, dist, _ = hold
+                t_hold = t0 + dist / speed
+                add(up[up_track], t0, speed, t_stop=t_hold)
+                mark_arrivals(up_track, t0, speed, max_dist=dist)
+                for k in range(max(0, math.ceil(t_hold)), n_hours):
+                    counts[sid][k] += 1
+                continue
             add(up[up_track], t0, speed)
             mark_arrivals(up_track, t0, speed)
-            add(down[down_track], t0 + up[up_track].length_m / speed + rng.uniform(*p.dwell_h), speed)
+            add(down[down_track], t0 + up[up_track].length_m / speed + dwell, speed)
         day += timedelta(days=1)
 
     return {(sid, t_first + timedelta(hours=k)): c[k] for sid, c in counts.items() for k in range(n_hours)}
