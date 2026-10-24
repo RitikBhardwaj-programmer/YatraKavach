@@ -31,8 +31,10 @@ risk:
   fusion_crowd_min: 1            # ... and crowd >= this (docs/PLAN.md "Risk fusion")
 vision:                          # camera crowd count (workstream V; docs/PLAN.md "Camera crowd count")
   model_file: model/dmcount_sha_fp16.onnx   # relative to backend/app/vision/; DM-Count (MIT), ShanghaiTech A weights
-  model_sha256: null             # V fills this in after the export
+  model_sha256: ced22a602d35b697693276d6bb6464a4d4c96a539d082695534a2934456cb118  # written by scripts/export_dmcount_onnx.py
+  model_label: "DM-Count ShanghaiTech A (official weights, model_sh_A.pth), fp16"  # written by the export script
   max_side_px: 1280              # images are resized so the longer side is at most this before inference
+  heatmap_alpha: 0.5             # display only: opacity of the density heatmap blended over the photo
   cameras:
     - id: CAM-KATRA-GATE
       segment_id: VD-TRUNK-01
