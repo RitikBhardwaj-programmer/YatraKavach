@@ -1,0 +1,9 @@
+[
+ {
+  "id": "CAM-KATRA-GATE",
+  "segment_id": "VD-TRUNK-01",
+  "view_area_m2": 150.0,
+  "label": "Katra gate (demo camera)",
+  "assumed": true
+ }
+]

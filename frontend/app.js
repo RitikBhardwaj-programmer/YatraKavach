@@ -13,6 +13,10 @@ const HISTORY_HOURS = 48;
 const PLAY_STEP_MS = 800;
 const LIVE_REFRESH_MS = 5 * 60 * 1000;
 const ALERTS_REFRESH_MS = 30 * 1000;
+// Lead time is always shown for both models together, never GFS alone (docs/replay-findings.md).
+const LEAD_SOURCES = [['gfs_seamless', 'GFS'], ['ecmwf_ifs025', 'ECMWF']];
+const HALF_HOUR_MS = 30 * 60000;
+const HEATMAP_OPACITY = 70; // % default for the heatmap overlay
 
 const params = new URLSearchParams(location.search);
 const FIXTURES = params.get('fixtures') === '1';
@@ -25,6 +29,7 @@ const state = {
   map: null, mapReady: false, fitted: false,
   openDetails: new Set(), editing: null, loadToken: 0, historyToken: 0,
   liveTimer: null,
+  impact: new Map(), cameras: [], samples: [], cam: null, camToken: 0, camObjectUrl: null,
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -53,7 +58,8 @@ function qs(obj) {
 function httpApi() {
   async function req(method, path, body, asText) {
     const opts = { method, headers: {} };
-    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    if (body instanceof FormData) opts.body = body;
+    else if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
     const r = await fetch('/api' + path, opts);
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
@@ -74,6 +80,20 @@ function httpApi() {
     audit: (id) => req('GET', '/audit?' + qs({ alert_id: id })),
     verify: () => req('GET', '/audit/verify'),
     officers: () => req('GET', '/officers'),
+    impact: (source) => req('GET', '/impact/counterfactual?' + qs({ source })),
+    cameras: () => req('GET', '/vision/cameras'),
+    samples: () => req('GET', '/vision/samples'),
+    sampleUrl: (name) => `/api/vision/samples/${encodeURIComponent(name)}`,
+    count: ({ cameraId, persist, sample, file }) => {
+      const fd = new FormData();
+      if (file) fd.append('image', file); else fd.append('sample', sample);
+      return req('POST', '/vision/count?' + qs({ camera_id: cameraId, persist: String(Boolean(persist)) }), fd);
+    },
+    // Fallback only: reachable when the repo root is served (python -m http.server), not under FastAPI.
+    leadFindings: () => fetch(FIXTURE_BASE + 'lead_time_findings.json').then((r) => {
+      if (!r.ok) throw new Error(`lead_time_findings.json: ${r.status}`);
+      return r.json();
+    }),
   };
 }
 
@@ -160,6 +180,17 @@ function fixtureApi() {
     audit: async (id) => [...await get(`audit/${id}.json`), ...localAudit.filter((r) => r.alert_id === id)],
     verify: () => get('audit_verify.json'),
     officers: () => get('officers.json'),
+    impact: (source) => get(`impact_counterfactual_${source}.json`),
+    cameras: () => get('vision_cameras.json'),
+    samples: () => get('vision_samples.json'),
+    sampleUrl: (name) => `${FIXTURE_BASE}vision/samples/${encodeURIComponent(name)}`,
+    // Same EXAMPLE result for any image; persist is not saved anywhere.
+    count: async ({ cameraId, sample, file }) => {
+      if (!(await get('vision_cameras.json')).some((c) => c.id === cameraId)) throw new Error(`404 unknown camera ${cameraId}`);
+      if (!file && !(await get('vision_samples.json')).some((x) => x.name === sample)) throw new Error(`404 unknown sample ${sample}`);
+      return clone(await get('vision_count.json'));
+    },
+    leadFindings: () => get('lead_time_findings.json'),
   };
 }
 
@@ -232,6 +263,7 @@ function driversText(p) {
   const dens = p.density_ppm2 ?? d.density_ppm2;
   if (persons != null) parts.push(`${num(persons, 0)} people${dens != null ? ` (${num(dens, 2)} per m²)` : ''}`);
   const sc = d.scenario || p.crowd_scenario;
+  if (sc?.source === 'camera') parts.push(`crowd from an AI camera count (${sc.camera_id || 'camera'}) on a demo photo`);
   if (sc && sc.held_persons) {
     parts.push(sc.releasing
       ? `held queue of ${num(sc.held_persons, 0)} people moving on after the hold ended (SIMULATED scenario)`
@@ -492,6 +524,7 @@ function setMode(mode) {
   if (mode === 'live' && !FIXTURES) state.liveTimer = setInterval(loadSegments, LIVE_REFRESH_MS);
   loadSegments();
   renderAlerts();
+  renderCamResult();
 }
 
 /* ---------- alerts ---------- */
@@ -508,13 +541,13 @@ async function loadVerify() {
   const b = $('#audit-badge');
   try {
     const v = await api.verify();
-    if (v.ok) { b.className = 'tag tag-ok'; b.textContent = `✓ Audit chain verified (${v.rows} rows)`; }
+    if (v.ok) { b.className = 'tag kpi-value tag-ok'; b.textContent = `✓ Audit chain verified (${v.rows} rows)`; }
     else {
-      b.className = 'tag tag-bad';
+      b.className = 'tag kpi-value tag-bad';
       b.textContent = `✗ Audit chain BROKEN${v.row != null || v.id != null ? ' at row ' + (v.row ?? v.id) : ''}`;
     }
   } catch (e) {
-    b.className = 'tag tag-bad'; b.textContent = 'Audit check unavailable';
+    b.className = 'tag kpi-value tag-bad'; b.textContent = 'Audit check unavailable';
     b.title = e.message;
   }
 }
@@ -532,6 +565,8 @@ function renderAlerts() {
   const order = (a, b) => (b.level - a.level) || String(alertTime(b)).localeCompare(String(alertTime(a)));
   const open = mine.filter((a) => OPEN_STATES.includes(a.state)).sort(order);
   const closed = mine.filter((a) => !OPEN_STATES.includes(a.state)).sort(order);
+  const waiting = open.filter((a) => ACTIONABLE.includes(a.state)).length;
+  $('#kpi-alerts').textContent = `${open.length}${waiting ? ` · ${waiting} awaiting approval` : ''}`;
   $('#alerts-list').innerHTML = open.length ? open.map(alertCard).join('')
     : `<p class="muted">No open alerts in ${state.mode.toUpperCase()} mode${at ? ' at this replay time' : ''}.</p>`;
   if (later) $('#alerts-list').insertAdjacentHTML('beforeend', `<p class="muted small">${later} alert${later > 1 ? 's' : ''} proposed after ${esc(fmtTs(at))} hidden; move the slider forward.</p>`);
@@ -649,6 +684,168 @@ async function onAlertClick(ev) {
   }
 }
 
+/* ---------- impact counterfactual (SIMULATED) ---------- */
+function impactData(source) {
+  if (!state.impact.has(source)) {
+    const p = api.impact(source);
+    p.catch(() => state.impact.delete(source)); // retry on the next request
+    state.impact.set(source, p);
+  }
+  return state.impact.get(source);
+}
+
+/* First RED lead time before the event, for GFS and ECMWF together. Rounded down to the half hour. */
+function leadText(row) {
+  if (!row.red) return 'no RED before the slide';
+  const h = Math.floor((Date.parse(row.event) - Date.parse(row.red)) / HALF_HOUR_MS) / 2;
+  return h > 0 ? `about ${num(h)} h before` : 'no RED before the slide';
+}
+
+async function loadLeadTime() {
+  let rows = null, from = '';
+  try {
+    const res = await Promise.all(LEAD_SOURCES.map(([src]) => impactData(src)));
+    rows = res.map((r) => ({ event: r.event_ts, target: (r.target_segments || []).join(', '),
+      red: r.scenarios.find((x) => x.key === 'first_red')?.decision_ts || null }));
+    from = FIXTURES ? 'impact fixtures (times from docs/replay-findings.md)' : 'impact API';
+  } catch {
+    try {
+      const f = await api.leadFindings();
+      rows = LEAD_SOURCES.map(([src]) => ({ event: f.event_ts, target: f.target_segment, red: f.first_red[src] || null }));
+      from = f.from;
+    } catch { rows = null; }
+  }
+  const el = $('#kpi-lead-value');
+  if (!rows) { el.textContent = 'unavailable'; $('#kpi-lead').title = 'Neither the impact API nor the replay findings fixture could be read.'; return; }
+  $('#kpi-lead-label').textContent = `Replay: first RED before the ${fmtTs(rows[0].event, false).replace(/^\d+ \w+ /, '')} slide`;
+  // One string for both models: the GFS lead time is never shown without the ECMWF one.
+  el.innerHTML = LEAD_SOURCES.map(([, name], i) => `<span class="lead">${name} <strong>${esc(leadText(rows[i]))}</strong></span>`).join('<span class="sep" aria-hidden="true"> · </span>');
+  $('#kpi-lead').title = `${rows[0].target}, slide ${fmtTs(rows[0].event)}. First RED: `
+    + LEAD_SOURCES.map(([, name], i) => `${name} ${rows[i].red ? fmtTs(rows[i].red, false) : 'none'}`).join(', ')
+    + `. Source: ${from}. Archived model rain, not a live forecast.`;
+}
+
+async function loadImpact() {
+  const body = $('#impact-body');
+  const source = $('#impact-source').value;
+  body.innerHTML = '<span class="muted small">Loading…</span>';
+  try {
+    const d = await impactData(source);
+    if ($('#impact-source').value === source) body.innerHTML = impactHtml(d);
+  } catch (e) {
+    body.innerHTML = `<p class="muted small">Impact scenarios unavailable: ${esc(e.message)}</p>`;
+  }
+}
+
+function impactHtml(d) {
+  const sc = [...(d.scenarios || [])].sort((a, b) => {
+    if (!a.decision_ts !== !b.decision_ts) return a.decision_ts ? -1 : 1; // no_action last
+    return Date.parse(a.decision_ts) - Date.parse(b.decision_ts);
+  });
+  if (!sc.length) return '<p class="muted small">No scenarios.</p>';
+  const max = Math.max(1, ...sc.map((x) => x.persons_on_target || 0));
+  const base = sc.find((x) => x.key === 'no_action')?.persons_on_target;
+  const targets = (d.target_segments || []).join(', ');
+  const rows = sc.map((x) => {
+    const n = x.persons_on_target ?? 0;
+    const holds = x.hold_points ? [...new Set(Object.values(x.hold_points))].join(', ') : '';
+    const fewer = base != null && x.key !== 'no_action' && base > n ? ` · ${num(base - n, 0)} fewer` : '';
+    return `<li class="bar-row">
+      <div class="bar-label"><strong>${esc(x.label || x.key)}</strong>
+        <span class="muted">${x.decision_ts ? `decided ${esc(fmtTs(x.decision_ts, false))}` : 'no hold'}${holds ? ` · hold at ${esc(holds)}` : ''}</span></div>
+      <div class="bar-track"><span class="bar${x.key === 'no_action' ? ' bar-none' : ''}" style="width:${((n / max) * 100).toFixed(1)}%"></span>
+        <span class="bar-val">${num(n, 0)}<span class="muted">${fewer}</span></span></div>
+    </li>`;
+  }).join('');
+  return `<p class="small">Pilgrims on <strong>${esc(targets)}</strong> at ${esc(fmtTs(d.snapshot_ts))},
+      the last whole hour before the slide at ${esc(fmtTs(d.event_ts, false))}.
+      ${d.example ? '<span class="tag tag-example">EXAMPLE numbers</span>' : ''}</p>
+    <ol class="bars" aria-label="Persons on the slide segment per decision time, earliest first">${rows}</ol>
+    <p class="muted small">Decision time = when officers approve the hold. Pilgrims already above the hold keep walking.</p>`;
+}
+
+/* ---------- camera crowd count (AI model on demo photos) ---------- */
+async function loadCameraPanel() {
+  try {
+    [state.cameras, state.samples] = await Promise.all([api.cameras(), api.samples()]);
+  } catch (e) {
+    $('#cam-result').innerHTML = `<p class="muted small">Camera count unavailable: ${esc(e.message)}</p>`;
+    $('#photo-credits').textContent = 'Demo photos: credits unavailable';
+    return;
+  }
+  $('#cam-select').innerHTML = state.cameras.map((c) => `<option value="${esc(c.id)}">${esc(c.label || c.id)}</option>`).join('');
+  $('#sample-select').innerHTML = '<option value="">— (uploaded image)</option>'
+    + state.samples.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('');
+  $('#sample-select').value = state.samples[0]?.name || '';
+  $('#photo-credits').innerHTML = state.samples.length ? 'Demo photos: ' + state.samples.map(photoCredit).join('; ') : 'Demo photos: none';
+  renderCamera();
+  if (state.samples.length) runCount(false);
+}
+
+function photoCredit(x) {
+  const text = `${esc(x.attribution)}${x.license ? ` (${esc(x.license)})` : ''}`;
+  return x.source_url ? `<a href="${esc(x.source_url)}">${text}</a>` : text;
+}
+
+function renderCamera() {
+  const c = state.cameras.find((x) => x.id === $('#cam-select').value);
+  $('#cam-camera').innerHTML = c ? `Watches segment <strong>${esc(c.segment_id)}</strong>; sees ${num(c.view_area_m2)} m²
+    of it${c.assumed ? ' (<strong>ASSUMED</strong> demo value)' : ''}.` : '';
+}
+
+async function runCount(persist) {
+  const cameraId = $('#cam-select').value;
+  const file = $('#cam-upload').files[0];
+  const sample = file ? null : $('#sample-select').value;
+  if (!cameraId || (!file && !sample)) return;
+  const token = ++state.camToken;
+  if (state.camObjectUrl) URL.revokeObjectURL(state.camObjectUrl);
+  state.camObjectUrl = file ? URL.createObjectURL(file) : null;
+  const input = { src: file ? state.camObjectUrl : api.sampleUrl(sample),
+    credit: file ? 'Your uploaded image (sent to this server for counting).'
+      : (() => { const x = state.samples.find((s) => s.name === sample); return x ? 'Photo: ' + photoCredit(x) : ''; })() };
+  $('#cam-result').innerHTML = '<p class="muted small">Counting…</p>';
+  try {
+    const r = await api.count({ cameraId, persist, sample, file });
+    if (token !== state.camToken) return;
+    state.cam = { r, input };
+    renderCamResult();
+    if (persist) {
+      await loadSegments();
+      flash(`Camera count applied to the live crowd on ${r.segment_id}${FIXTURES ? ' (fixtures: not saved)' : ''}`);
+    }
+  } catch (e) {
+    if (token === state.camToken) $('#cam-result').innerHTML = `<p class="muted small">Count failed: ${esc(e.message)}</p>`;
+  }
+}
+
+function renderCamResult() {
+  const el = $('#cam-result');
+  if (!state.cam || !el) return;
+  const { r, input } = state.cam;
+  const op = $('#cam-opacity')?.value ?? HEATMAP_OPACITY;
+  el.innerHTML = `<figure class="cam-fig">
+      <div class="cam-stack">
+        <img class="cam-orig" src="${esc(input.src)}" alt="Input image">
+        ${r.heatmap_png_b64 ? `<img class="cam-heat" src="data:image/png;base64,${r.heatmap_png_b64}" alt="Crowd density heatmap" style="opacity:${op / 100}">` : ''}
+      </div>
+      <figcaption class="small muted">${input.credit}</figcaption>
+    </figure>
+    <label class="small cam-op">Heatmap <input type="range" id="cam-opacity" min="0" max="100" value="${op}" aria-label="Heatmap opacity"></label>
+    <dl class="kv kv-cam">
+      <dt>Count</dt><dd><strong class="big">${num(r.count, 0)}</strong> people in view
+        ${r.example ? '<span class="tag tag-example">EXAMPLE</span>' : ''}</dd>
+      <dt>Density</dt><dd>${num(r.density_ppm2, 2)} per m²</dd>
+      <dt>On segment</dt><dd>${num(r.persons_on_segment, 0)} people on ${esc(r.segment_id)}
+        <span class="muted small">(density × segment area)</span></dd>
+      <dt>Level</dt><dd>${pill(r.level)}</dd>
+      <dt>Model</dt><dd class="small">${esc(r.model)} · ${num(r.ms, 0)} ms</dd>
+    </dl>
+    <div class="actions">${state.mode === 'live'
+      ? `<button type="button" class="btn btn-primary" id="cam-apply" title="Write this count into the live crowd for ${esc(r.segment_id)} and re-run live risk">Apply to live crowd</button>`
+      : '<span class="muted small">Switch to LIVE to apply a count to the live crowd.</span>'}</div>`;
+}
+
 /* ---------- boot ---------- */
 async function boot() {
   if (FIXTURES) {
@@ -675,6 +872,16 @@ async function boot() {
     if (m) { setPlaying(false); setIdx(nearestIdx(m.dataset.ts)); }
   });
   $('#officer').addEventListener('change', renderAlerts);
+  $('#impact-source').addEventListener('change', loadImpact);
+  $('#cam-select').addEventListener('change', () => { renderCamera(); runCount(false); });
+  $('#sample-select').addEventListener('change', () => { $('#cam-upload').value = ''; runCount(false); });
+  $('#cam-upload').addEventListener('change', () => { if ($('#cam-upload').files[0]) { $('#sample-select').value = ''; runCount(false); } });
+  $('#cam-result').addEventListener('input', (e) => {
+    if (e.target.id === 'cam-opacity') $('.cam-heat')?.style.setProperty('opacity', String(e.target.value / 100));
+  });
+  $('#cam-result').addEventListener('click', (e) => {
+    if (e.target.id === 'cam-apply' && state.mode === 'live') { e.target.disabled = true; runCount(true); }
+  });
   document.querySelector('.side').addEventListener('click', onAlertClick);
   document.querySelector('.side').addEventListener('toggle', (e) => {
     const d = e.target;
@@ -691,6 +898,9 @@ async function boot() {
   if (params.get('segment')) selectSegment(params.get('segment'));
   loadAlerts();
   loadVerify();
+  loadLeadTime();
+  loadImpact();
+  loadCameraPanel();
   if (!FIXTURES) {
     setInterval(() => {
       if (!state.editing && !document.activeElement?.closest('.alert')) loadAlerts();

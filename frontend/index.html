@@ -19,9 +19,22 @@
       <button type="button" role="radio" data-mode="live" aria-checked="false">LIVE</button>
       <button type="button" role="radio" data-mode="replay" aria-checked="true">REPLAY</button>
     </div>
+    <ul class="kpis" aria-label="Key figures">
+      <li class="kpi kpi-lead" id="kpi-lead" tabindex="0">
+        <span class="kpi-label" id="kpi-lead-label">First RED before the slide</span>
+        <span class="kpi-value" id="kpi-lead-value" aria-live="polite">loading…</span>
+      </li>
+      <li class="kpi">
+        <span class="kpi-label">Open alerts</span>
+        <span class="kpi-value" id="kpi-alerts" aria-live="polite">–</span>
+      </li>
+      <li class="kpi">
+        <span class="kpi-label">Audit</span>
+        <span id="audit-badge" class="tag kpi-value" aria-live="polite">Audit chain: checking…</span>
+      </li>
+    </ul>
     <div class="status">
       <span id="fixtures-tag" class="tag tag-example" hidden title="Data from docs/api-fixtures, not the API">EXAMPLE DATA (fixtures)</span>
-      <span id="audit-badge" class="tag" aria-live="polite">Audit chain: checking…</span>
       <span id="data-time" class="data-time"></span>
     </div>
   </header>
@@ -71,6 +84,34 @@
           <div id="closed-list"></div>
         </details>
       </section>
+
+      <section class="panel" id="impact-panel" aria-labelledby="impact-title">
+        <div class="panel-head">
+          <h2 id="impact-title">What if the hold had been approved earlier?</h2>
+          <label class="small">Rain model
+            <select id="impact-source" aria-label="Rain model for the impact scenarios">
+              <option value="gfs_seamless">GFS</option>
+              <option value="ecmwf_ifs025">ECMWF IFS</option>
+            </select>
+          </label>
+        </div>
+        <p class="sim-line"><span class="tag tag-sim">SIMULATED</span>
+          Simulated pilgrims; only the ascent is stopped; see README</p>
+        <div id="impact-body" aria-live="polite"><span class="muted small">Loading…</span></div>
+      </section>
+
+      <section class="panel" id="camera-panel" aria-labelledby="camera-title">
+        <h2 id="camera-title">AI crowd count</h2>
+        <p class="sim-line"><span class="tag tag-demo">AI model output on a demo photo, not a Vaishno Devi camera</span></p>
+        <div class="cam-controls">
+          <label>Camera <select id="cam-select" aria-label="Camera"></select></label>
+          <label>Demo photo <select id="sample-select" aria-label="Demo photo"></select></label>
+          <label class="upload">Or upload an image
+            <input type="file" id="cam-upload" accept="image/jpeg,image/png,image/webp"></label>
+        </div>
+        <div id="cam-camera" class="small muted"></div>
+        <div id="cam-result" aria-live="polite"></div>
+      </section>
     </aside>
   </main>
 
@@ -78,7 +119,10 @@
     Trails © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> (ODbL) ·
     Weather data by <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0) ·
     Elevation: Copernicus DEM GLO-90 via Open-Meteo ·
-    Crowd counts and delivery channels are <span class="tag tag-sim">SIMULATED</span> ·
+    Crowd counts and delivery channels are <span class="tag tag-sim">SIMULATED</span>
+    (except a camera count an officer applies in LIVE mode) ·
+    Crowd model: DM-Count (MIT) ·
+    <span id="photo-credits">Demo photos: credits loading…</span> ·
     Prototype, CAP status=Exercise.
   </footer>
 </body>
