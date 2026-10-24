@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EXAMPLE fixture, not a real alert. Hindi and Urdu text needs native-speaker review. -->
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>yatrakavach-A-0002</identifier>
+  <sender>yatrakavach@example.invalid</sender>
+  <sent>2025-08-26T05:00:00+05:30</sent>
+  <status>Exercise</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>en-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-OLD-01 to VD-OLD-11</headline>
+    <description>EXERCISE. Severe landslide risk on old track. Leave VD-OLD-01 to VD-OLD-11 now and go to the nearest shelter.</description>
+    <instruction>Clear segments VD-OLD-01 to VD-OLD-11 (old track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-26T08:00:00+05:30</expires>
+    <area>
+      <areaDesc>old track: VD-OLD-01 to VD-OLD-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01796,74.93557 33.01776,74.93563 33.01731,74.93578 33.0157,74.93664 33.01529,74.93689 33.00829,74.94319 33.00796,74.94358 33.0078,74.94391 33.00772,74.94414 33.0076,74.94467 33.00772,74.94521 33.00805,74.9456 33.0085,74.94574 33.0287,74.94994 33.03106,74.95015 33.03151,74.95001 33.03184,74.94962 33.03196,74.94908 33.03195,74.9486 33.03183,74.94807 33.03167,74.94784 33.02439,74.93894 33.02407,74.93855 33.0236,74.93818 33.02209,74.93741 33.01841,74.93571 33.01796,74.93557</polygon>
+    </area>
+  </info>
+  <info>
+    <language>hi-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-OLD-01 to VD-OLD-11</headline>
+    <description>अभ्यास। old track पर भूस्खलन का गंभीर खतरा। VD-OLD-01 to VD-OLD-11 तुरंत खाली करें और निकटतम आश्रय में जाएँ।</description>
+    <instruction>Clear segments VD-OLD-01 to VD-OLD-11 (old track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-26T08:00:00+05:30</expires>
+    <area>
+      <areaDesc>old track: VD-OLD-01 to VD-OLD-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01796,74.93557 33.01776,74.93563 33.01731,74.93578 33.0157,74.93664 33.01529,74.93689 33.00829,74.94319 33.00796,74.94358 33.0078,74.94391 33.00772,74.94414 33.0076,74.94467 33.00772,74.94521 33.00805,74.9456 33.0085,74.94574 33.0287,74.94994 33.03106,74.95015 33.03151,74.95001 33.03184,74.94962 33.03196,74.94908 33.03195,74.9486 33.03183,74.94807 33.03167,74.94784 33.02439,74.93894 33.02407,74.93855 33.0236,74.93818 33.02209,74.93741 33.01841,74.93571 33.01796,74.93557</polygon>
+    </area>
+  </info>
+  <info>
+    <language>ur-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-OLD-01 to VD-OLD-11</headline>
+    <description>مشق۔ old track پر لینڈ سلائیڈ کا شدید خطرہ۔ VD-OLD-01 to VD-OLD-11 فوراً خالی کریں اور قریب ترین پناہ گاہ میں جائیں۔</description>
+    <instruction>Clear segments VD-OLD-01 to VD-OLD-11 (old track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-26T08:00:00+05:30</expires>
+    <area>
+      <areaDesc>old track: VD-OLD-01 to VD-OLD-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01796,74.93557 33.01776,74.93563 33.01731,74.93578 33.0157,74.93664 33.01529,74.93689 33.00829,74.94319 33.00796,74.94358 33.0078,74.94391 33.00772,74.94414 33.0076,74.94467 33.00772,74.94521 33.00805,74.9456 33.0085,74.94574 33.0287,74.94994 33.03106,74.95015 33.03151,74.95001 33.03184,74.94962 33.03196,74.94908 33.03195,74.9486 33.03183,74.94807 33.03167,74.94784 33.02439,74.93894 33.02407,74.93855 33.0236,74.93818 33.02209,74.93741 33.01841,74.93571 33.01796,74.93557</polygon>
+    </area>
+  </info>
+</alert>

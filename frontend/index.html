@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YatraKavach officer console</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>YatraKavach</strong>
+      <span class="sub">Officer console · Vaishno Devi tracks</span>
+    </div>
+    <div class="mode" role="radiogroup" aria-label="Data mode">
+      <button type="button" role="radio" data-mode="live" aria-checked="false">LIVE</button>
+      <button type="button" role="radio" data-mode="replay" aria-checked="true">REPLAY</button>
+    </div>
+    <div class="status">
+      <span id="fixtures-tag" class="tag tag-example" hidden title="Data from docs/api-fixtures, not the API">EXAMPLE DATA (fixtures)</span>
+      <span id="audit-badge" class="tag" aria-live="polite">Audit chain: checking…</span>
+      <span id="data-time" class="data-time"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-wrap" aria-label="Segment risk map">
+      <div id="map" role="application" aria-label="Map of track segments coloured by risk level"></div>
+      <div class="legend" aria-label="Legend">
+        <div class="legend-title">Risk level</div>
+        <ul id="legend-list"></ul>
+        <div class="legend-note">Line width also grows with level.</div>
+      </div>
+      <div id="map-error" class="map-error" hidden></div>
+
+      <div id="replay-bar" class="replay-bar" aria-label="Replay controls">
+        <button type="button" id="play" class="btn" aria-label="Play replay">▶ Play</button>
+        <div class="slider-wrap">
+          <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="Replay time">
+          <div id="event-marks" class="event-marks"></div>
+        </div>
+        <output id="replay-time" for="slider" class="replay-time"></output>
+        <div id="event-list" class="event-list" aria-label="Events"></div>
+        <p class="replay-note">Replay of archived model rain (<span id="replay-source">GFS</span> historical
+          forecast, 9-25 km grid). Close to what a live system would have seen, not identical.</p>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel" id="segment-panel" aria-labelledby="segment-title">
+        <h2 id="segment-title">Segment</h2>
+        <div id="segment-body" class="muted">Select a segment on the map or in the list.</div>
+        <label class="seg-pick">Or pick: <select id="segment-select" aria-label="Select segment"></select></label>
+      </section>
+
+      <section class="panel" id="alerts-panel" aria-labelledby="alerts-title">
+        <div class="panel-head">
+          <h2 id="alerts-title">Alerts</h2>
+          <label class="officer">Acting as
+            <select id="officer" aria-label="Acting officer"></select>
+          </label>
+        </div>
+        <p class="muted small">Alerts reach pilgrims only after a named officer approves (RED needs two).
+          Delivery channels are <span class="tag tag-sim">SIMULATED</span>.</p>
+        <div id="alerts-list" aria-live="polite"></div>
+        <details id="closed-alerts" class="closed" hidden>
+          <summary>Closed alerts</summary>
+          <div id="closed-list"></div>
+        </details>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    Trails © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> (ODbL) ·
+    Weather data by <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0) ·
+    Elevation: Copernicus DEM GLO-90 via Open-Meteo ·
+    Crowd counts and delivery channels are <span class="tag tag-sim">SIMULATED</span> ·
+    Prototype, CAP status=Exercise.
+  </footer>
+</body>
+</html>

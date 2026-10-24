@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EXAMPLE fixture, not a real alert. Hindi and Urdu text needs native-speaker review. -->
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>yatrakavach-A-0003</identifier>
+  <sender>yatrakavach@example.invalid</sender>
+  <sent>2025-08-25T17:00:00+05:30</sent>
+  <status>Exercise</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>en-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-HIMKOTI-01 to VD-HIMKOTI-11</headline>
+    <description>EXERCISE. Severe landslide risk on Himkoti track. Leave VD-HIMKOTI-01 to VD-HIMKOTI-11 now and go to the nearest shelter.</description>
+    <instruction>Clear segments VD-HIMKOTI-01 to VD-HIMKOTI-11 (Himkoti track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-25T20:00:00+05:30</expires>
+    <area>
+      <areaDesc>Himkoti track: VD-HIMKOTI-01 to VD-HIMKOTI-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01654,74.92891 33.01609,74.92905 33.01476,74.92986 33.01443,74.93025 33.01269,74.93237 33.01128,74.93483 33.00753,74.94143 33.00723,74.94208 33.00711,74.94262 33.00692,74.9444 33.00704,74.94494 33.00737,74.94533 33.00766,74.94552 33.00811,74.94566 33.0085,74.94574 33.02684,74.94812 33.02729,74.94797 33.02751,74.94779 33.02784,74.9474 33.0284,74.94647 33.02856,74.94595 33.02868,74.94541 33.02871,74.94526 33.02869,74.94507 33.02857,74.94453 33.02593,74.9379 33.02288,74.93295 33.02152,74.93094 33.02119,74.93055 33.02107,74.93047 33.01711,74.92906 33.01666,74.92891 33.01654,74.92891</polygon>
+    </area>
+  </info>
+  <info>
+    <language>hi-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-HIMKOTI-01 to VD-HIMKOTI-11</headline>
+    <description>अभ्यास। Himkoti track पर भूस्खलन का गंभीर खतरा। VD-HIMKOTI-01 to VD-HIMKOTI-11 तुरंत खाली करें और निकटतम आश्रय में जाएँ।</description>
+    <instruction>Clear segments VD-HIMKOTI-01 to VD-HIMKOTI-11 (Himkoti track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-25T20:00:00+05:30</expires>
+    <area>
+      <areaDesc>Himkoti track: VD-HIMKOTI-01 to VD-HIMKOTI-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01654,74.92891 33.01609,74.92905 33.01476,74.92986 33.01443,74.93025 33.01269,74.93237 33.01128,74.93483 33.00753,74.94143 33.00723,74.94208 33.00711,74.94262 33.00692,74.9444 33.00704,74.94494 33.00737,74.94533 33.00766,74.94552 33.00811,74.94566 33.0085,74.94574 33.02684,74.94812 33.02729,74.94797 33.02751,74.94779 33.02784,74.9474 33.0284,74.94647 33.02856,74.94595 33.02868,74.94541 33.02871,74.94526 33.02869,74.94507 33.02857,74.94453 33.02593,74.9379 33.02288,74.93295 33.02152,74.93094 33.02119,74.93055 33.02107,74.93047 33.01711,74.92906 33.01666,74.92891 33.01654,74.92891</polygon>
+    </area>
+  </info>
+  <info>
+    <language>ur-IN</language>
+    <category>Geo</category>
+    <event>Landslide risk on pilgrim track</event>
+    <urgency>Immediate</urgency>
+    <severity>Extreme</severity>
+    <certainty>Likely</certainty>
+    <senderName>YatraKavach demo (EXAMPLE)</senderName>
+    <headline>RED: VD-HIMKOTI-01 to VD-HIMKOTI-11</headline>
+    <description>مشق۔ Himkoti track پر لینڈ سلائیڈ کا شدید خطرہ۔ VD-HIMKOTI-01 to VD-HIMKOTI-11 فوراً خالی کریں اور قریب ترین پناہ گاہ میں جائیں۔</description>
+    <instruction>Clear segments VD-HIMKOTI-01 to VD-HIMKOTI-11 (Himkoti track); move pilgrims to the nearest designated shelter</instruction>
+    <expires>2025-08-25T20:00:00+05:30</expires>
+    <area>
+      <areaDesc>Himkoti track: VD-HIMKOTI-01 to VD-HIMKOTI-11 (approx. 100 m buffer)</areaDesc>
+      <polygon>33.01654,74.92891 33.01609,74.92905 33.01476,74.92986 33.01443,74.93025 33.01269,74.93237 33.01128,74.93483 33.00753,74.94143 33.00723,74.94208 33.00711,74.94262 33.00692,74.9444 33.00704,74.94494 33.00737,74.94533 33.00766,74.94552 33.00811,74.94566 33.0085,74.94574 33.02684,74.94812 33.02729,74.94797 33.02751,74.94779 33.02784,74.9474 33.0284,74.94647 33.02856,74.94595 33.02868,74.94541 33.02871,74.94526 33.02869,74.94507 33.02857,74.94453 33.02593,74.9379 33.02288,74.93295 33.02152,74.93094 33.02119,74.93055 33.02107,74.93047 33.01711,74.92906 33.01666,74.92891 33.01654,74.92891</polygon>
+    </area>
+  </info>
+</alert>
