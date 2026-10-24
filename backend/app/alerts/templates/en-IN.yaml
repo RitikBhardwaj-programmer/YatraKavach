@@ -1,0 +1,21 @@
+# Alert text templates, en-IN. Placeholders: {segments} {place} {nearby} {upstream} {shelter}.
+# officer_action: wording from docs/PLAN.md "Alert workflow" (shown to officers, editable before approval).
+# cap: public text for the CAP <info> block. Levels: 2 ORANGE, 3 RED.
+language: en-IN
+event: Landslide risk on pilgrim track
+officer_action:
+  2: "Hold pilgrims at {upstream}; stop ascent beyond {place}"
+  3: "Clear segment {segments} (near {nearby}); move pilgrims to {shelter}"
+cap:
+  2:
+    headline: "Landslide warning on the Vaishno Devi track near {nearby}"
+    description: "Heavy rain has raised the landslide risk on {segments}. EXERCISE message from a prototype, not a real warning."
+    instruction: "Wait at {upstream}. Do not walk beyond {place}. Follow the instructions of shrine and police staff."
+  3:
+    headline: "Severe landslide danger on the Vaishno Devi track near {nearby}"
+    description: "Severe landslide danger on {segments}. EXERCISE message from a prototype, not a real warning."
+    instruction: "Leave {segments} now. Go to {shelter}. Do not stop under steep slopes. Follow staff instructions."
+  cancel:
+    headline: "Earlier warning for {segments} is cancelled"
+    description: "The earlier warning for {segments} near {nearby} is cancelled. EXERCISE message from a prototype."
+    instruction: "Continue to follow staff instructions."

@@ -1,0 +1,17 @@
+# Alert text templates, hi-IN. NEEDS NATIVE-SPEAKER REVIEW: written as short, simple sentences by a non-native
+# author (AI-assisted) and not yet checked. Place names stay in Latin script. Placeholders as in en-IN.yaml.
+language: hi-IN
+event: तीर्थ मार्ग पर भूस्खलन का खतरा
+cap:
+  2:
+    headline: "{nearby} के पास वैष्णो देवी मार्ग पर भूस्खलन की चेतावनी"
+    description: "भारी बारिश से {segments} पर भूस्खलन का खतरा बढ़ गया है। यह प्रोटोटाइप का अभ्यास संदेश है, असली चेतावनी नहीं।"
+    instruction: "{upstream} पर रुकें। {place} से आगे न जाएँ। श्राइन बोर्ड और पुलिस कर्मियों के निर्देश मानें।"
+  3:
+    headline: "{nearby} के पास वैष्णो देवी मार्ग पर भूस्खलन का गंभीर खतरा"
+    description: "{segments} पर भूस्खलन का गंभीर खतरा है। यह प्रोटोटाइप का अभ्यास संदेश है, असली चेतावनी नहीं।"
+    instruction: "{segments} को अभी छोड़ें। {shelter} जाएँ। खड़ी ढलान के नीचे न रुकें। कर्मियों के निर्देश मानें।"
+  cancel:
+    headline: "{segments} के लिए पहले की चेतावनी रद्द"
+    description: "{nearby} के पास {segments} के लिए पहले की चेतावनी रद्द की गई है। यह प्रोटोटाइप का अभ्यास संदेश है।"
+    instruction: "कर्मियों के निर्देश मानते रहें।"

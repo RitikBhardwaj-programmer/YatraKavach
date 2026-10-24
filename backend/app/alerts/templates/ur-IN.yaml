@@ -1,0 +1,17 @@
+# Alert text templates, ur-IN. NEEDS NATIVE-SPEAKER REVIEW: written as short, simple sentences by a non-native
+# author (AI-assisted) and not yet checked. Place names stay in Latin script. Placeholders as in en-IN.yaml.
+language: ur-IN
+event: یاترا راستے پر لینڈ سلائیڈ کا خطرہ
+cap:
+  2:
+    headline: "{nearby} کے قریب ویشنو دیوی راستے پر لینڈ سلائیڈ کی وارننگ"
+    description: "تیز بارش سے {segments} پر لینڈ سلائیڈ کا خطرہ بڑھ گیا ہے۔ یہ پروٹوٹائپ کا مشقی پیغام ہے، اصل وارننگ نہیں۔"
+    instruction: "{upstream} پر رکیں۔ {place} سے آگے نہ جائیں۔ شرائن بورڈ اور پولیس عملے کی ہدایات مانیں۔"
+  3:
+    headline: "{nearby} کے قریب ویشنو دیوی راستے پر لینڈ سلائیڈ کا شدید خطرہ"
+    description: "{segments} پر لینڈ سلائیڈ کا شدید خطرہ ہے۔ یہ پروٹوٹائپ کا مشقی پیغام ہے، اصل وارننگ نہیں۔"
+    instruction: "{segments} کو ابھی چھوڑ دیں۔ {shelter} جائیں۔ کھڑی ڈھلان کے نیچے نہ رکیں۔ عملے کی ہدایات مانیں۔"
+  cancel:
+    headline: "{segments} کے لیے پہلے کی وارننگ منسوخ"
+    description: "{nearby} کے قریب {segments} کے لیے پہلے کی وارننگ منسوخ کر دی گئی ہے۔ یہ پروٹوٹائپ کا مشقی پیغام ہے۔"
+    instruction: "عملے کی ہدایات مانتے رہیں۔"
