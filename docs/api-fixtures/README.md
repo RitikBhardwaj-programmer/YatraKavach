@@ -30,6 +30,27 @@ What is real and what is not:
 | `GET /api/audit/verify` | `audit_verify.json` |
 | `GET /api/officers` | `officers.json` |
 | `POST /api/replay/run` | `replay_run.json` |
+| `GET /api/impact/counterfactual?source=gfs_seamless` | `impact_counterfactual_gfs_seamless.json` (also `_ecmwf_ifs025`) |
+| `GET /api/vision/cameras` | `vision_cameras.json` |
+| `GET /api/vision/samples` | `vision_samples.json` |
+| `GET /api/vision/samples/{name}` | `vision/samples/{name}` |
+| `POST /api/vision/count` | `vision_count.json` (same EXAMPLE result for any image, sample or `persist`) |
+| (console header, no endpoint) | `lead_time_findings.json` |
+
+### Impact and vision fixtures (EXAMPLES; `python docs/api-fixtures/build_console2_fixtures.py`, needs Pillow)
+- **Impact (EXAMPLE numbers):** `persons_on_target` values (100, 200, 500, 700, 1000) are round EXAMPLE
+  numbers, not simulation output; workstream I computes the real ones. Decision and event times are copied
+  from `docs/replay-findings.md` "System result" (first ORANGE / RED of `VD-OLD-01` per source, the ~12:00
+  board closure, the 14:40 slide). Hold points (`VD-TRUNK-13` for both leaf routes) are EXAMPLE values.
+- **Vision (EXAMPLE):** the camera is `vision.cameras` from `config/thresholds.yaml` (its `view_area_m2` is
+  an ASSUMED demo value). The sample `example-placeholder.png` is a generated picture of grey dots, NOT a photo
+  and not a camera; workstream V ships the real, openly licensed photos and their credits. The count (300) and
+  `ms` (500) are round EXAMPLE numbers, not model output; density, persons and level follow the PLAN maths from
+  that count (300 / 150 m2 = 2.0 per m2 -> YELLOW; x 487.8 m x 6.0 m of `VD-TRUNK-01`). The heatmap is a blur
+  of the drawn dots, not a model density map.
+- **Lead time (measured, not an example):** `lead_time_findings.json` copies the first RED times of
+  `docs/replay-findings.md` for GFS and ECMWF. The console uses it only when the impact API is unavailable,
+  and labels it "from replay findings".
 
 Fields the console reads beyond the contract (optional; the console works without them):
 `level_name`, `expires_at`, `example` on alerts; `ts`, `mode`, `thresholds_version` on segment properties;

@@ -1,0 +1,50 @@
+{
+ "simulated": true,
+ "example": true,
+ "fixture_note": "EXAMPLE fixture for building the console; not a real result. Times from docs/replay-findings.md; numbers are round examples.",
+ "source": "gfs_seamless",
+ "target_segments": [
+  "VD-OLD-01"
+ ],
+ "event_ts": "2025-08-26T14:40:00+05:30",
+ "snapshot_ts": "2025-08-26T14:00:00+05:30",
+ "scenarios": [
+  {
+   "key": "no_action",
+   "label": "No action",
+   "decision_ts": null,
+   "hold_points": null,
+   "persons_on_target": 1000
+  },
+  {
+   "key": "first_orange",
+   "label": "Hold at first ORANGE",
+   "decision_ts": "2025-08-25T15:00:00+05:30",
+   "hold_points": {
+    "VD-OLD": "VD-TRUNK-13",
+    "VD-HIMKOTI": "VD-TRUNK-13"
+   },
+   "persons_on_target": 100
+  },
+  {
+   "key": "first_red",
+   "label": "Hold at first RED",
+   "decision_ts": "2025-08-26T05:00:00+05:30",
+   "hold_points": {
+    "VD-OLD": "VD-TRUNK-13",
+    "VD-HIMKOTI": "VD-TRUNK-13"
+   },
+   "persons_on_target": 200
+  },
+  {
+   "key": "official_closure",
+   "label": "Official closure (~12:00, approximate)",
+   "decision_ts": "2025-08-26T12:00:00+05:30",
+   "hold_points": {
+    "VD-OLD": "VD-TRUNK-13",
+    "VD-HIMKOTI": "VD-TRUNK-13"
+   },
+   "persons_on_target": 500
+  }
+ ]
+}

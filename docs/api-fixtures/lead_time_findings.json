@@ -1,0 +1,10 @@
+{
+ "example": false,
+ "from": "docs/replay-findings.md, 'System result' (measured 2026-10-24, thresholds 2026-10-24.1)",
+ "target_segment": "VD-OLD-01",
+ "event_ts": "2025-08-26T14:40:00+05:30",
+ "first_red": {
+  "gfs_seamless": "2025-08-26T05:00:00+05:30",
+  "ecmwf_ifs025": "2025-08-26T13:00:00+05:30"
+ }
+}
