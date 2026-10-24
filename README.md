@@ -90,7 +90,7 @@ cd YatraKavach
 docker compose up -d --build
 docker compose exec api python scripts/load_segments.py
 docker compose exec api python scripts/load_replay_rain.py
-curl -X POST "http://localhost:8000/api/replay/run"
+curl -X POST "http://localhost:8000/api/replay/run?until=2025-08-26T14:00:00%2B05:30"
 ```
 
 Open http://localhost:8000/ and pick **REPLAY**. Move the slider to 26 Aug 2025 to watch the tracks turn red,
@@ -99,7 +99,11 @@ click a segment to see why, and approve an alert as two different demo officers.
 - The replay run takes about 30-60 seconds.
 - If a local PostgreSQL already uses port 5432 or something uses 8000, choose other host ports, for example
   `YK_DB_PORT=55432 YK_API_PORT=8010 docker compose up -d --build`.
-- To replay only up to a moment (the console's clock), add `?until=2025-08-26T14:00:00%2B05:30`.
+- `until` is the replay clock: the run stops at 26 Aug 14:00 IST, 40 minutes before the slide, with 6 alerts
+  open for officers. Without it the run goes to 28 Aug 23:00; by then the rain has stopped and the system
+  withdraws every unapproved alert, so the console shows none open.
+- The clock only moves forward and the audit log is append-only, so a later run with an earlier `until` changes
+  nothing. To start the demo again, reset the database first: `docker compose down -v`, then repeat the steps above.
 - Live mode: `curl -X POST "http://localhost:8000/api/hazard/run?mode=live"` fetches current Open-Meteo rain.
 - API docs: http://localhost:8000/docs
 
