@@ -3,10 +3,12 @@ version: "2026-10-23.1"
 hazard:
   daily_watch_mm: 14.35          # Shah et al. 2024, NH-44 (Udhampur-Banihal) daily threshold -> YELLOW
   antecedent_15d_mm: 53.0        # Shah et al. 2024, NH-44 antecedent (20-day value used for 15 days; conservative)
+  orange_daily_factor: 2.0       # ORANGE when R24 >= factor x daily_watch_mm and R15d >= antecedent_15d_mm (docs/PLAN.md)
   orange_r24_mm: 72.0            # rule of thumb: half the Nepal high-risk daily value (inference)
   red_r24_mm: 144.0              # Dahal & Hasegawa 2008: > 144 mm/day high landslide risk (Nepal Himalaya)
   id_curve: {a: 73.90, b: -0.79, durations_h: [1, 3, 6, 12, 24]}   # I = a * D^b (mm/h), Dahal & Hasegawa 2008 -> RED
   steep_slope_deg: 40.0          # raise level by one step when terrain slope >= this (inference)
+  high_susceptibility_class: 3   # raise level by one step when GSI susceptibility class >= this (docs/PLAN.md)
   hysteresis_updates: 2
 crowd:
   bands_ppm2: [2.0, 4.0, 6.0]    # persons/m2 -> YELLOW, ORANGE, RED. 2-3 and 6 sourced; 4 interpolated
