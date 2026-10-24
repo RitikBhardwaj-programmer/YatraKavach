@@ -32,9 +32,21 @@ def test_segment_carries_hysteresis(t):
     # Enough rain in one hour block for YELLOW, then dry: level holds one hour, then drops.
     wet = t.daily_watch_mm
     rows = [(T0, wet)] + [(T0 + i * HOUR, 0.0) for i in range(1, 27)]
-    seg = Segment("X-01", "katra", 10.0, None, False)
-    levels = [lvl for lvl, _ in score_segment(seg, score_point(to_series(rows), t), t)]
+    seg = Segment("X-01", "katra", 10.0, None, None)
+    s = to_series(rows)
+    levels = [lvl for lvl, _ in score_segment(seg, score_point(s, t), s.times, t)]
     assert levels[0] == YELLOW
     assert levels[23] == YELLOW          # rain still inside the 24 h window
     assert levels[24] == YELLOW          # first hour below: held by hysteresis
     assert levels[25] == GREEN           # second hour below: drops
+
+
+def test_past_slide_counts_only_after_it_happened(t):
+    # Same rain before and after the slide: the step-up appears only for hours after past_slide_at.
+    rows = [(T0 + i * HOUR, t.daily_watch_mm / 24 + 0.01) for i in range(48)]
+    slide_at = T0 + 30 * HOUR
+    s = to_series(rows)
+    seg = Segment("X-01", "katra", 10.0, None, slide_at)
+    out = score_segment(seg, score_point(s, t), s.times, t)
+    assert out[29][0] == YELLOW and "step_up" not in out[29][1]
+    assert out[31][0] == YELLOW + 1 and out[31][1]["step_up"] == ["PAST_SLIDE"]

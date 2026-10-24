@@ -71,6 +71,7 @@ class Alert:
     approvals: tuple[str, ...] = ()
     sent_at: datetime | None = None
     expires_at: datetime | None = None
+    last_action_at: datetime | None = None   # latest officer action (e.g. a first approval of a RED alert)
 
 
 @dataclass(frozen=True)
@@ -135,10 +136,25 @@ def cancel(alert: Alert, officer: Officer, now: datetime, reason: str | None = N
 
 
 def withdraw(alert: Alert, now: datetime, reason: str) -> tuple[Alert, list[Event]]:
-    """System cancel of a proposal that nobody acted on before its risk condition cleared."""
+    """System cancel of a proposal that nobody acted on before its risk condition cleared.
+
+    An alert with an approval is never withdrawn: an officer acted on it, so only an officer may close it.
+    """
     _require(alert, PENDING, "withdraw")
+    if alert.approvals:
+        raise WorkflowError("cannot withdraw an alert that an officer has already approved")
     return replace(alert, state=State.CANCELLED), [
         Event("WITHDRAW", SYSTEM, alert.state, State.CANCELLED, now, reason)]
+
+
+def extend(alert: Alert, now: datetime, added: list[str], action_text: str) -> tuple[Alert, list[Event]]:
+    """System growth of a pending, unapproved alert to more segments of the same route and level."""
+    _require(alert, PENDING, "extend")
+    if alert.approvals:
+        raise WorkflowError("cannot extend an alert that an officer has already approved")
+    return replace(alert, proposed_action=action_text), [
+        Event("EXTEND", SYSTEM, alert.state, alert.state, now, "more segments of this route reached this level",
+              {"added_segments": added, "before": alert.proposed_action, "after": action_text})]
 
 
 def ack(alert: Alert, officer: Officer, now: datetime, reason: str | None = None) -> tuple[Alert, list[Event]]:
@@ -169,10 +185,12 @@ def edit(alert: Alert, officer: Officer, now: datetime, action_text: str | None)
 
 def tick(alert: Alert, now: datetime, rules: Rules) -> tuple[Alert, list[Event]]:
     """Time-driven transitions: escalation of an unanswered proposal, expiry of a sent alert."""
-    if alert.state == State.PROPOSED and now - alert.created_at >= rules.escalate_after:
+    last = max(alert.created_at, alert.last_action_at or alert.created_at)
+    if alert.state == State.PROPOSED and now - last >= rules.escalate_after:
         return replace(alert, state=State.ESCALATED), [
             Event("ESCALATE", SYSTEM, State.PROPOSED, State.ESCALATED, now,
-                  f"no officer action within {int(rules.escalate_after.total_seconds() // 60)} min")]
+                  f"no officer action within {int(rules.escalate_after.total_seconds() // 60)} min",
+                  {"approvals": len(alert.approvals), "needs_approvals": alert.needs_approvals})]
     if alert.state in LIVE and alert.expires_at is not None and now >= alert.expires_at:
         return replace(alert, state=State.EXPIRED), [Event("EXPIRE", SYSTEM, alert.state, State.EXPIRED, now)]
     return alert, []

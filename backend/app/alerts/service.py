@@ -79,7 +79,15 @@ def _row(c, alert_id: int, lock: bool = False) -> dict:
 
 def _to_model(r: dict) -> Alert:
     return Alert(r["level"], State(r["state"]), r["proposed_action"], r["created_at"], r["needs_approvals"],
-                 tuple(a["officer"] for a in r["approvals"]), r["sent_at"], r["expires_at"])
+                 tuple(a["officer"] for a in r["approvals"]), r["sent_at"], r["expires_at"],
+                 max((a["ts"] for a in r["approvals"]), default=None))
+
+
+def lock_writes(c) -> None:
+    """Take the audit lock first in every write transaction, so two writers always lock in the same order
+    (no deadlock between row locks and the audit lock) and two replay runs cannot propose the same alert twice.
+    Transaction-level advisory locks are re-entrant, so append_audit taking it again is fine."""
+    c.execute("SELECT pg_advisory_xact_lock(%s)", (AUDIT_LOCK,))
 
 
 def _store(c, r: dict, new: Alert, events: list[Event], snapshot: dict[str, Any]) -> None:
@@ -102,6 +110,7 @@ def public(r: dict) -> dict:
 def tick_all(c, at: datetime | None = None) -> int:
     """Escalate unanswered proposals and expire sent alerts. Returns the number of transitions."""
     at = at or now()
+    lock_writes(c)
     ids = [r["id"] for r in c.execute(
         "SELECT id FROM alerts WHERE state IN ('PROPOSED', 'SENT', 'ACKED') ORDER BY id FOR UPDATE").fetchall()]
     n = 0
@@ -129,6 +138,7 @@ def act(c, alert_id: int, action: str, officer_id: str | None, reason: str | Non
         proposed_action: str | None = None) -> dict:
     """Run one officer action (approve | reject | cancel | ack | break-glass | edit) on an alert."""
     officer = _officer(c, officer_id)
+    lock_writes(c)
     r = _row(c, alert_id, lock=True)
     ticked, tick_events = workflow.tick(_to_model(r), now(), rules())
     if tick_events:
@@ -157,9 +167,11 @@ def propose_from_risk(c, mode: str, source: str, start: datetime, end: datetime)
     whose risk condition cleared. Returns {"proposed": [alerts], "withdrawn": [alert ids]}."""
     tick_all(c)
     topo = load_topology(c)
-    stored = [proposals.OpenAlert(r["id"], list(r["segment_ids"]), r["level"], r["trigger_ts"]) for r in c.execute(
-        "SELECT id, segment_ids, level, trigger_ts FROM alerts WHERE mode = %s AND source = %s ORDER BY id",
-        (mode, source)).fetchall()]
+    stored = [proposals.OpenAlert(r["id"], list(r["segment_ids"]), r["level"], r["trigger_ts"],
+                                  extendable=r["state"] in workflow.PENDING and not r["approved"]) for r in c.execute(
+        """SELECT a.id, a.segment_ids, a.level, a.trigger_ts, a.state,
+                  EXISTS (SELECT 1 FROM alert_approvals p WHERE p.alert_id = a.id) AS approved
+           FROM alerts a WHERE a.mode = %s AND a.source = %s ORDER BY a.id""", (mode, source)).fetchall()]
     risk_at: dict[datetime, dict[str, dict]] = {}
     for r in c.execute("""SELECT segment_id, ts, hazard_level, crowd_level, risk_level, drivers FROM segment_risk
                           WHERE mode = %s AND source = %s AND ts BETWEEN %s AND %s ORDER BY ts""",
@@ -168,7 +180,7 @@ def propose_from_risk(c, mode: str, source: str, start: datetime, end: datetime)
                                                                               "risk_level", "drivers")}
     rs, version = rules(), thresholds()["version"]
     new, cleared = proposals.propose(topo, risk_at, stored, rs.propose_at)
-    created, withdrawn = [], []
+    created, withdrawn, extended = [], [], []
     for p in new:
         t = now()
         model, events = workflow.propose(p.level, p.proposed_action, t, rs)
@@ -182,16 +194,30 @@ def propose_from_risk(c, mode: str, source: str, start: datetime, end: datetime)
         for e in events:
             append_audit(c, e, r["id"], {"mode": mode, "source": source, **p.snapshot}, model.proposed_action)
         created.append(r["id"])
-    for a in cleared:
-        r = _row(c, a.id, lock=True)
-        if State(r["state"]) not in workflow.PENDING:
+    for a in stored:
+        if not a.extended:
             continue
+        r = _row(c, a.id, lock=True)
+        added = [s for _, run in a.extended for s in run]
+        action = templates.officer_action(a.level, templates.context(topo, a.segment_ids))
+        model, events = workflow.extend(_to_model(r), now(), added, action)
+        c.execute("UPDATE alerts SET segment_ids = %s WHERE id = %s", (a.segment_ids, a.id))
+        _store(c, r, model, events, {"mode": mode, "source": source,
+                                     "extended": [{"ts": ts.isoformat(), "segments": run} for ts, run in a.extended],
+                                     "risk": {s: risk_at[ts].get(s) for ts, run in a.extended for s in run}})
+        extended.append(a.id)
+    for a in cleared:
+        if a.id is None:
+            continue
+        r = _row(c, a.id, lock=True)
+        if State(r["state"]) not in workflow.PENDING or r["approvals"]:
+            continue   # an officer already acted: keep the alert and its approvals for the officer to close
         model, events = workflow.withdraw(
             _to_model(r), now(), f"risk below level {a.level} on all segments at {a.cleared_at.isoformat()}")
         _store(c, r, model, events, {"mode": mode, "source": source, "cleared_at": a.cleared_at.isoformat(),
                                      "risk": {s: risk_at[a.cleared_at].get(s) for s in a.segment_ids}})
         withdrawn.append(a.id)
-    return {"proposed": [get_alert(c, i) for i in created], "withdrawn": withdrawn}
+    return {"proposed": [get_alert(c, i) for i in created], "withdrawn": withdrawn, "extended": extended}
 
 
 # --- CAP -----------------------------------------------------------------------------------------------------
@@ -207,6 +233,8 @@ def cap_xml(c, alert_id: int) -> bytes:
     lines = [json.loads(g["g"])["coordinates"] for g in c.execute(
         "SELECT ST_AsGeoJSON(geom) AS g FROM segments WHERE id = ANY(%s)", (list(r["segment_ids"]),)).fetchall()]
     ordered = list(r["segment_ids"])
+    if r["state"] == "CANCELLED" and r["sent_at"] is None:
+        raise WorkflowError("this alert was cancelled before it was sent, so there is no public message to cancel")
     data = cap.CapInput(r["id"], r["mode"], r["level"], r["state"], ordered, r["proposed_action"], r["created_at"],
-                        r["sent_at"], r["expires_at"], ref)
+                        r["sent_at"], r["expires_at"], ref, r["updated_at"])
     return cap.build(data, templates.context(topo, ordered), cap.area_polygon(lines))

@@ -34,7 +34,7 @@ class Segment:
     rain_point: str
     terrain_slope_deg: float | None
     susceptibility: int | None
-    past_slide: bool
+    past_slide_at: datetime | None   # a past slide counts only for hours after it
 
 
 def to_series(rows: list[tuple[datetime, float]]) -> RainSeries:
@@ -74,18 +74,19 @@ def score_point(series: RainSeries, t: HazardThresholds) -> list[tuple[dict[int,
 
 
 def score_segment(seg: Segment, point_scores: list[tuple[dict[int, float], dict[str, Any]]],
-                  t: HazardThresholds) -> list[tuple[int, dict[str, Any]]]:
+                  times: list[datetime], t: HazardThresholds) -> list[tuple[int, dict[str, Any]]]:
     """Per hour: (level, drivers) for one segment, with step-up and hysteresis carried hour to hour."""
     state, out = HysteresisState(), []
-    for sums, notes in point_scores:
-        state, drivers = segment_level(sums, state, seg.terrain_slope_deg, seg.susceptibility, seg.past_slide, t)
+    for ts, (sums, notes) in zip(times, point_scores):
+        slide = seg.past_slide_at is not None and ts > seg.past_slide_at
+        state, drivers = segment_level(sums, state, seg.terrain_slope_deg, seg.susceptibility, slide, t)
         out.append((state.level, {**drivers, **notes, "rain_point": seg.rain_point}))
     return out
 
 
 def _load(c, mode: str, source: str) -> tuple[list[Segment], dict[str, RainSeries]]:
     segs = [Segment(**r) for r in c.execute(
-        "SELECT id, rain_point, terrain_slope_deg, susceptibility, past_slide FROM segments ORDER BY id").fetchall()]
+        "SELECT id, rain_point, terrain_slope_deg, susceptibility, past_slide_at FROM segments ORDER BY id").fetchall()]
     rows: dict[str, list[tuple[datetime, float]]] = {}
     for r in c.execute("SELECT point, ts, precip_mm FROM rain_hourly WHERE mode = %s AND source = %s ORDER BY point, ts",
                        (mode, source)):
@@ -111,7 +112,7 @@ def run(mode: str, source: str, start: datetime | None = None, end: datetime | N
         rows = []
         for seg in segs:
             times = series[seg.rain_point].times
-            for ts, (level, drivers) in zip(times, score_segment(seg, point_scores[seg.rain_point], t)):
+            for ts, (level, drivers) in zip(times, score_segment(seg, point_scores[seg.rain_point], times, t)):
                 if (start is None or ts >= start) and (end is None or ts <= end):
                     rows.append((seg.id, ts, mode, source, level, Jsonb(drivers), t.version))
         with c.cursor() as cur:

@@ -12,11 +12,12 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import transform, unary_union
 
 from app.alerts import templates
+from app.risk.config import thresholds
 
 NS = "urn:oasis:names:tc:emergency:cap:1.2"
 IST = timezone(timedelta(hours=5, minutes=30))
 SENDER = "yatrakavach-prototype"            # no real issuing authority: this is an exercise
-BUFFER_M = 100.0
+BUFFER_M = float(thresholds()["alerts"]["cap_area_buffer_m"])
 UTM_43N = "EPSG:32643"                      # metric CRS for the Vaishno Devi area (74.9 E)
 _SEVERITY = {2: ("Expected", "Severe", "Likely", "Avoid"), 3: ("Immediate", "Extreme", "Likely", "Evacuate")}
 
@@ -33,6 +34,7 @@ class CapInput:
     sent_at: datetime | None
     expires_at: datetime | None
     reference: tuple[int, datetime] | None   # (alert id, sent time) of the alert this one updates
+    updated_at: datetime | None = None       # time of the last transition (the cancel time for a Cancel)
 
 
 def identifier(alert_id: int, mode: str) -> str:
@@ -71,7 +73,10 @@ def msg_type(a: CapInput) -> str:
 def build(a: CapInput, ctx: dict[str, str], polygon: list[tuple[float, float]]) -> bytes:
     kind = msg_type(a)
     ident = identifier(a.alert_id, a.mode) + ("-cancel" if kind == "Cancel" else "")
-    sent = a.sent_at or a.created_at
+    if kind == "Cancel" and a.sent_at is None:
+        raise ValueError("a Cancel needs the original alert to have been sent")
+    # A Cancel is a new message: its <sent> is the cancel time; <references> points at the original send.
+    sent = (a.updated_at or a.sent_at) if kind == "Cancel" else (a.sent_at or a.created_at)
     root = ET.Element(f"{{{NS}}}alert")
     _sub(root, "identifier", ident)
     _sub(root, "sender", SENDER)
@@ -82,7 +87,7 @@ def build(a: CapInput, ctx: dict[str, str], polygon: list[tuple[float, float]]) 
     _sub(root, "note", "SIMULATED prototype exercise (YatraKavach). Not an official warning. "
                        f"Mode: {a.mode}. Workflow state: {a.state}. Delivery channels are SIMULATED.")
     if kind == "Cancel":
-        _sub(root, "references", f"{SENDER},{identifier(a.alert_id, a.mode)},{cap_time(sent)}")
+        _sub(root, "references", f"{SENDER},{identifier(a.alert_id, a.mode)},{cap_time(a.sent_at)}")
     elif kind == "Update":
         ref_id, ref_sent = a.reference
         _sub(root, "references", f"{SENDER},{identifier(ref_id, a.mode)},{cap_time(ref_sent)}")

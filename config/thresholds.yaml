@@ -1,5 +1,5 @@
 # Versioned rule set. Every hazard/risk row stores `version`. Sources: docs/research.md.
-version: "2026-10-23.1"
+version: "2026-10-24.1"
 hazard:
   daily_watch_mm: 14.35          # Shah et al. 2024, NH-44 (Udhampur-Banihal) daily threshold -> YELLOW
   antecedent_15d_mm: 53.0        # Shah et al. 2024, NH-44 antecedent (20-day value used for 15 days; conservative)
@@ -10,11 +10,22 @@ hazard:
   steep_slope_deg: 40.0          # raise level by one step when terrain slope >= this (inference)
   high_susceptibility_class: 3   # raise level by one step when GSI susceptibility class >= this (docs/PLAN.md)
   hysteresis_updates: 2
+  step_up_rules_excluded: [YELLOW_R15D]   # antecedent rain alone lasts all monsoon; no step-up from it (alert fatigue)
 crowd:
   bands_ppm2: [2.0, 4.0, 6.0]    # persons/m2 -> YELLOW, ORANGE, RED. 2-3 and 6 sourced; 4 interpolated
+  holding:                       # SIMULATED scenario: stopping the ascent makes pilgrims queue at a holding point
+    enabled: true
+    points: [VD-TRUNK-01, VD-TRUNK-07, VD-TRUNK-13]   # Katra gate, Banganga, Adhkuwari (SMVDSB has holding areas; exact sites SIMULATED)
+    hold_at_hazard_level: 2      # hold below the first segment at ORANGE or worse (the system's "hold pilgrims at X" action)
+    release_per_hour: 3000       # SIMULATED rate at which a held queue moves on after the hold ends
+    max_held_persons: 15000      # SIMULATED: beyond this, new registrations are assumed suspended (no further growth)
 alerts:
   propose_at_risk_level: 2
   escalate_after_min: 10
   red_needs_approvals: 2
   orange_needs_approvals: 1
   expires_after_min: 180
+  cap_area_buffer_m: 100.0        # CAP <area> polygon = this buffer around the alert's segments
+risk:
+  fusion_hazard_min: 2           # risk = hazard + 1 when hazard >= this ...
+  fusion_crowd_min: 1            # ... and crowd >= this (docs/PLAN.md "Risk fusion")

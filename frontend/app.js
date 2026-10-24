@@ -201,8 +201,18 @@ function ruleWords(rule) {
 }
 const num = (v, d = 1) => Number(v).toLocaleString('en-IN', { maximumFractionDigits: d });
 
+/* The API nests drivers as {rule, hazard: {...}, crowd: {...}}; fixtures may be flat. Flatten both. */
+function flatDrivers(p) {
+  const raw = p.drivers || {};
+  const h = raw.hazard || {};
+  const steps = h.step_up || raw.step_up || [];
+  return { ...raw, ...h, rule: h.rule || raw.rule, fusion_rule: raw.hazard ? raw.rule : null,
+    slope_raise: raw.slope_raise || steps.includes('STEEP_SLOPE'), past_slide: steps.includes('PAST_SLIDE'),
+    scenario: raw.crowd?.scenario || null };
+}
+
 function driversText(p) {
-  const d = p.drivers || {};
+  const d = flatDrivers(p);
   const parts = [];
   if (d.r24_mm != null) {
     let s = `24 h rain ${num(d.r24_mm)} mm`;
@@ -217,9 +227,16 @@ function driversText(p) {
     if (d.slope_raise) s += ` (steep${d.steep_slope_deg ? `, ≥ ${num(d.steep_slope_deg)} deg` : ''}: level raised one step)`;
     parts.push(s);
   }
+  if (d.past_slide) parts.push('a landslide was recorded here earlier: level raised one step');
   const persons = p.persons ?? d.persons;
   const dens = p.density_ppm2 ?? d.density_ppm2;
   if (persons != null) parts.push(`${num(persons, 0)} people${dens != null ? ` (${num(dens, 2)} per m²)` : ''}`);
+  const sc = d.scenario || p.crowd_scenario;
+  if (sc && sc.held_persons) {
+    parts.push(sc.releasing
+      ? `held queue of ${num(sc.held_persons, 0)} people moving on after the hold ended (SIMULATED scenario)`
+      : `ascent stopped here: ${num(sc.held_persons, 0)} pilgrims held in a queue (SIMULATED holding-area scenario)`);
+  }
   return parts;
 }
 
@@ -339,7 +356,7 @@ function renderSegment() {
   if (!f) { body.innerHTML = 'Select a segment on the map or in the list.'; body.className = 'muted'; return; }
   const p = f.properties;
   body.className = '';
-  const d = p.drivers || {};
+  const d = flatDrivers(p);
   const fused = p.risk_level != null && p.risk_level > Math.max(p.hazard_level ?? 0, p.crowd_level ?? 0);
   const simCrowd = p.simulated_crowd !== false;
   const why = driversText(p);

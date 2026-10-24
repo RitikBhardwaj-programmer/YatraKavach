@@ -40,10 +40,11 @@ def _level(segment_id: str, ts: datetime, source: str = "gfs_seamless") -> int:
 
 def test_segments_loaded(replay_gfs):
     with conn() as c:
-        rows = c.execute("SELECT id, rain_point, past_slide, susceptibility FROM segments").fetchall()
+        rows = c.execute("SELECT id, rain_point, past_slide, past_slide_at, susceptibility FROM segments").fetchall()
     assert len(rows) == 35
     by_id = {r["id"]: r for r in rows}
     assert by_id["VD-OLD-01"]["past_slide"] and by_id["VD-OLD-01"]["rain_point"] == "adhkuwari"
+    assert by_id["VD-OLD-01"]["past_slide_at"] == RED_BY
     assert by_id["VD-TRUNK-01"]["rain_point"] == "katra"
     assert sum(r["past_slide"] for r in rows) == 1
     assert all(r["susceptibility"] is None for r in rows)
@@ -70,7 +71,8 @@ def test_drivers_explain_level(replay_gfs):
     with conn() as c:
         d = c.execute("SELECT drivers FROM segment_hazard WHERE segment_id = 'VD-OLD-01' AND ts = %s "
                       "AND source = 'gfs_seamless'", (RED_BY.replace(minute=0),)).fetchone()["drivers"]
-    assert d["level_name"] == "RED" and d["rule"] and d["r24_mm"] > 0 and d["step_up"] == ["PAST_SLIDE"]
+    # The 26 Aug slide happened at 14:40, so at 14:00 it must not raise the level (no hindsight in the replay).
+    assert d["level_name"] == "RED" and d["rule"] and d["r24_mm"] > 0 and "PAST_SLIDE" not in d.get("step_up", [])
 
 
 def test_api_timeline_and_run(replay_gfs):

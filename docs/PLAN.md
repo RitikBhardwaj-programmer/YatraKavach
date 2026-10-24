@@ -30,10 +30,11 @@ HTML + JS + MapLibre GL JS (no build step), served by FastAPI at `/`. MIT licenc
 Each workstream works on its own branch and opens its own PR. Never edit another workstream's paths.
 
 ## Database contract (`db/init/001_schema.sql`)
-- `segments(id, route_id, route_name, seq, geom LineString 4326, length_m, width_m, kind, landmark, elev_m, terrain_slope_deg, grade_deg, susceptibility)`
+- `segments(id, route_id, route_name, seq, geom LineString 4326, length_m, width_m, kind, landmark, elev_m, terrain_slope_deg, grade_deg, susceptibility, past_slide, past_slide_at)`; `past_slide_at` (011) = time of a recorded slide
 - `rain_hourly(point, ts, precip_mm, source, mode)`; mode = `live` or `replay`
 - `segment_hazard(segment_id, ts, mode, level, drivers jsonb, thresholds_version)` — written by A
-- `segment_crowd(segment_id, ts, mode, persons, density_ppm2, level, simulated)` — written by B
+- `segment_crowd(segment_id, ts, mode, persons, density_ppm2, level, simulated, scenario jsonb)` — written by B;
+  `scenario` (021) = SIMULATED holding-area note `{scenario, held_persons, held_routes, releasing}` or NULL
 - `segment_risk(segment_id, ts, mode, hazard_level, crowd_level, risk_level, drivers jsonb)` — written by B
 - `alerts(...)`, `alert_approvals(...)`, `audit_log(...)`, `officers(...)` — written by B
 Levels everywhere: 0 GREEN, 1 YELLOW (watch), 2 ORANGE (warning), 3 RED (severe).
@@ -45,14 +46,24 @@ Hazard per segment (A). Rain point = nearest of katra / adhkuwari / bhawan.
 - ORANGE: R24 >= 2 x 14.35 mm and R15d >= 53 mm, or R24 >= 72 mm.
 - RED: R24 >= 144 mm (Dahal & Hasegawa 2008), or mean intensity over D hours >= 73.90 x D^-0.79 mm/h for D in {1, 3, 6, 12, 24}.
 - Segment factor: if terrain_slope_deg >= 40 or susceptibility >= 3 (or a past slide is recorded), raise a
-  level >= 1 by one step (max 3).
+  level >= 1 by one step (max 3). Two limits (review fixes, 2026-10-24):
+  - A past slide counts only for hours after `past_slide_at`, so a replay never uses the slide it should warn about.
+  - No step-up from `YELLOW_R15D` alone (`step_up_rules_excluded`): antecedent rain stays high all monsoon and
+    would keep steep segments ORANGE for weeks (alert fatigue).
 - Hysteresis: a level drops only after 2 consecutive updates below it.
 - `drivers` must explain the level in words and numbers, e.g. `{"r24_mm": 63.9, "r24_threshold": 14.35, "ratio": 4.5, "slope_deg": 39.0, "rule": "ORANGE_R24"}`.
 
 Crowd per segment (B): density = persons / (length_m x width_m). <2 GREEN, 2-4 YELLOW, 4-6 ORANGE, >=6 RED
 (persons/m2; 2-3 and 6 sourced, 4 interpolated).
 
-Risk fusion (B): risk = max(hazard, crowd); if hazard >= 2 and crowd >= 1, risk = min(3, hazard + 1).
+Risk fusion (B): risk = max(hazard, crowd); if hazard >= 2 and crowd >= 1, risk = min(3, hazard + 1)
+(levels in `config/thresholds.yaml` `risk`).
+
+Holding-area scenario (SIMULATED, `crowd.holding`): per leaf route and hour, ascent stops at the nearest holding
+point (Katra gate, Banganga, Adhkuwari) below the first segment with hazard >= ORANGE. Ascending pilgrims who
+reach the holding point join a queue there (capped at `max_held_persons`: registrations assumed suspended);
+after the hold ends the queue moves on at `release_per_hour`. This shows the second-order risk: closing a track
+crowds the people below it. The base flow above a hold is not reduced (exposure there is overstated).
 
 ## Alert workflow (B)
 States: PROPOSED -> APPROVED -> SENT -> ACKED; PROPOSED -> REJECTED; PROPOSED -> ESCALATED (no action in
@@ -60,8 +71,14 @@ States: PROPOSED -> APPROVED -> SENT -> ACKED; PROPOSED -> REJECTED; PROPOSED ->
 the system (action WITHDRAW) when the risk condition cleared before anyone acted. Sending is SIMULATED and
 happens as soon as the approvals are complete.
 - Auto-proposal when risk_level >= 2 on a segment with no covering alert. An alert covers its segments from
-  its `trigger_ts` (risk time, so replay-safe) until their risk falls below the alert's own level. Contiguous
-  segments of one route at one level form one alert; a RED over an ORANGE references it (CAP Update if sent).
+  its `trigger_ts` (risk time, so replay-safe) until their risk falls below the alert's own level. All
+  segments of one route at one level form one alert. While that alert is pending and has no approval, later
+  segments of the same route and level join it (system action EXTEND, audited) instead of a new alert.
+  A RED over an ORANGE references it (CAP Update if sent).
+- An alert with an approval is never withdrawn by the system; escalation counts from the latest officer action.
+- CAP Cancel: `<sent>` = cancel time, `<references>` = the original send; a never-sent cancelled alert has no
+  CAP message (HTTP 409).
+- Every write transaction takes the audit advisory lock first (no deadlock, no duplicate proposals).
   Action text from templates:
   ORANGE "Hold pilgrims at <upstream landmark>; stop ascent beyond <segment landmark>";
   RED "Clear segment <id> (<landmark>); move pilgrims to <nearest shelter>".
@@ -72,7 +89,7 @@ happens as soon as the approvals are complete.
   DELETE (DB trigger). `GET /api/audit/verify` recomputes the chain.
 - CAP 1.2 XML per alert: `status=Exercise`, `msgType` Alert/Update/Cancel with `references`,
   one `<info>` per language (en-IN, hi-IN, ur-IN) from pre-written templates, `<area>` polygon =
-  100 m buffer of the segments. Templates in `backend/app/alerts/templates/`. Dogri/Kashmiri: TODO, need a native speaker.
+  `alerts.cap_area_buffer_m` (100 m) buffer of the segments. Templates in `backend/app/alerts/templates/`. Dogri/Kashmiri: TODO, need a native speaker.
 
 ## HTTP API contract (all JSON unless stated; times ISO 8601 with +05:30)
 - `GET /api/health` -> `{"status":"ok"}`

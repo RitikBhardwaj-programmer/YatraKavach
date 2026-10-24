@@ -19,7 +19,7 @@ def run_risk(c, mode: str, start: datetime, end: datetime, source: str | None = 
     """Fuse every hazard row in [start, end] with the crowd row of the same segment and hour."""
     rows = c.execute(
         """SELECT h.segment_id, h.ts, h.source, h.level, h.drivers, h.thresholds_version,
-                  c.persons, c.density_ppm2, c.level AS crowd_level, c.simulated
+                  c.persons, c.density_ppm2, c.level AS crowd_level, c.simulated, c.scenario
            FROM segment_hazard h
            LEFT JOIN segment_crowd c ON c.segment_id = h.segment_id AND c.ts = h.ts AND c.mode = h.mode
            WHERE h.mode = %s AND h.ts BETWEEN %s AND %s AND (%s::text IS NULL OR h.source = %s)""",
@@ -28,7 +28,7 @@ def run_risk(c, mode: str, start: datetime, end: datetime, source: str | None = 
     for r in rows:
         crowd = None if r["persons"] is None else {
             "persons": r["persons"], "density_ppm2": r["density_ppm2"], "level": r["crowd_level"],
-            "simulated": r["simulated"]}
+            "simulated": r["simulated"], "scenario": r["scenario"]}
         fused = fuse(r["level"], {**r["drivers"], "thresholds_version": r["thresholds_version"]}, crowd)
         out.append({"segment_id": r["segment_id"], "ts": r["ts"], "mode": mode, "source": r["source"],
                     **fused, "drivers": Jsonb(fused["drivers"])})
@@ -49,7 +49,7 @@ def segments_geojson(c, mode: str, at: datetime, source: str | None) -> dict[str
         """SELECT s.id, s.route_id, s.route_name, s.seq, s.length_m, s.width_m, s.kind, s.landmark, s.elev_m,
                   s.terrain_slope_deg, s.grade_deg, s.susceptibility, s.past_slide, s.rain_point,
                   ST_AsGeoJSON(s.geom) AS geometry, r.ts, r.hazard_level, r.crowd_level, r.risk_level, r.drivers,
-                  c.persons, c.density_ppm2, c.simulated
+                  c.persons, c.density_ppm2, c.simulated, c.scenario AS crowd_scenario
            FROM segments s
            LEFT JOIN LATERAL (SELECT * FROM segment_risk r WHERE r.segment_id = s.id AND r.mode = %(mode)s
                               AND r.source = %(source)s AND r.ts <= %(at)s ORDER BY r.ts DESC LIMIT 1) r ON true

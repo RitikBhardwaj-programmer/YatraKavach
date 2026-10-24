@@ -144,3 +144,12 @@ def test_segment_level_reports_hold_and_step_up(t):
     assert d["raw_rule"] == "GREEN" and d["updates_below"] == 1
     s, d = segment_level(sums(t), s, 45.0, None, False, t)
     assert s.level == GREEN and d["rule"] == "GREEN"
+
+
+def test_no_step_up_from_antecedent_rain_alone(t):
+    # A wet monsoon keeps R15d high for weeks; a steep slope must not turn that into a standing ORANGE.
+    assert "YELLOW_R15D" in t.step_up_rules_excluded
+    s, d = segment_level(sums(t, r24=0.0, r15d=t.antecedent_15d_mm), HysteresisState(), 45.0, None, True, t)
+    assert s.level == YELLOW and d["rule"] == "YELLOW_R15D" and "step_up" not in d
+    s, d = segment_level(sums(t, r24=t.daily_watch_mm, r15d=t.antecedent_15d_mm), s, 45.0, None, False, t)
+    assert s.level == ORANGE and d["step_up"] == ["STEEP_SLOPE"]

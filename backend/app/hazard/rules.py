@@ -29,6 +29,7 @@ class HazardThresholds:
     steep_slope_deg: float
     high_susceptibility_class: int
     hysteresis_updates: int
+    step_up_rules_excluded: tuple[str, ...] = ()
 
     @classmethod
     def from_config(cls, cfg: dict[str, Any]) -> "HazardThresholds":
@@ -46,6 +47,7 @@ class HazardThresholds:
             steep_slope_deg=float(h["steep_slope_deg"]),
             high_susceptibility_class=int(h["high_susceptibility_class"]),
             hysteresis_updates=int(h["hysteresis_updates"]),
+            step_up_rules_excluded=tuple(h.get("step_up_rules_excluded", ())),
         )
 
     @property
@@ -119,6 +121,11 @@ def apply_step_up(level: int, reasons: list[str]) -> int:
     return min(RED, level + 1) if level >= YELLOW and reasons else level
 
 
+def step_up_allowed(rule: str, t: HazardThresholds) -> bool:
+    """Segment factors do not raise rules listed in step_up_rules_excluded (e.g. antecedent rain alone)."""
+    return rule not in t.step_up_rules_excluded
+
+
 @dataclass(frozen=True)
 class HysteresisState:
     level: int = GREEN
@@ -140,7 +147,7 @@ def segment_level(sums_mm: dict[int, float], state: HysteresisState, slope_deg: 
                   t: HazardThresholds) -> tuple[HysteresisState, dict[str, Any]]:
     """One hourly update for one segment: rain rule, step-up, hysteresis. Returns (new state, drivers)."""
     rain, drivers = rain_level(sums_mm, t)
-    reasons = step_up_reasons(slope_deg, susceptibility, past_slide, t)
+    reasons = step_up_reasons(slope_deg, susceptibility, past_slide, t) if step_up_allowed(drivers["rule"], t) else []
     raw = apply_step_up(rain, reasons)
     new = apply_hysteresis(state, raw, t.hysteresis_updates)
 
