@@ -508,9 +508,11 @@ function renderAlerts() {
   const at = currentAt();
   const inMode = state.alerts.filter((a) => !a.mode || a.mode === state.mode);
   // In replay, an alert proposed after the replay time does not exist yet at that time.
-  const mine = inMode.filter((a) => !at || !a.created_at || Date.parse(a.created_at) <= Date.parse(at));
+  // Use the risk time that triggered the alert (trigger_ts); created_at is wall-clock time of the replay run.
+  const alertTime = (a) => a.trigger_ts || a.created_at;
+  const mine = inMode.filter((a) => !at || !alertTime(a) || Date.parse(alertTime(a)) <= Date.parse(at));
   const later = inMode.length - mine.length;
-  const order = (a, b) => (b.level - a.level) || String(b.created_at).localeCompare(String(a.created_at));
+  const order = (a, b) => (b.level - a.level) || String(alertTime(b)).localeCompare(String(alertTime(a)));
   const open = mine.filter((a) => OPEN_STATES.includes(a.state)).sort(order);
   const closed = mine.filter((a) => !OPEN_STATES.includes(a.state)).sort(order);
   $('#alerts-list').innerHTML = open.length ? open.map(alertCard).join('')
