@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>YatraKavach officer console</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -12,7 +13,7 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <strong>YatraKavach</strong>
+      <h1>YatraKavach</h1>
       <span class="sub">Officer console · Vaishno Devi tracks</span>
     </div>
     <div class="mode" role="radiogroup" aria-label="Data mode">
@@ -41,13 +42,16 @@
 
   <main class="layout">
     <section class="map-wrap" aria-label="Segment risk map">
-      <div id="map" role="application" aria-label="Map of track segments coloured by risk level"></div>
-      <div class="legend" aria-label="Legend">
-        <div class="legend-title">Risk level</div>
-        <ul id="legend-list"></ul>
-        <div class="legend-note">Line width also grows with level.</div>
+      <div class="map-area">
+        <div id="map" role="application" aria-label="Map of track segments coloured by risk level"></div>
+        <details class="legend" id="legend" open>
+          <summary class="legend-title">Risk level</summary>
+          <ul id="legend-list"></ul>
+          <div class="legend-note">Line width also grows with level.</div>
+        </details>
+        <div id="situation" class="situation" hidden></div>
+        <div id="map-error" class="map-error" hidden></div>
       </div>
-      <div id="map-error" class="map-error" hidden></div>
 
       <div id="replay-bar" class="replay-bar" aria-label="Replay controls">
         <button type="button" id="play" class="btn" aria-label="Play replay">▶ Play</button>
@@ -63,13 +67,35 @@
     </section>
 
     <aside class="side">
-      <section class="panel" id="segment-panel" aria-labelledby="segment-title">
+      <section id="guide" class="guide" aria-labelledby="guide-title" hidden>
+        <div class="guide-head">
+          <h2 id="guide-title">Demo: the 26 Aug 2025 slide in three steps</h2>
+          <button type="button" class="btn btn-ghost btn-sm" id="guide-close" aria-label="Hide the demo steps">Hide</button>
+        </div>
+        <ol class="guide-steps">
+          <li><button type="button" class="guide-step" data-step="replay"><span class="guide-num" aria-hidden="true">1</span>
+            <span><strong>Replay the rain</strong><span class="guide-sub">Move the slider; click a red segment</span></span></button></li>
+          <li><button type="button" class="guide-step" data-step="alerts"><span class="guide-num" aria-hidden="true">2</span>
+            <span><strong>Approve the hold</strong><span class="guide-sub">RED needs two officers</span></span></button></li>
+          <li><button type="button" class="guide-step" data-step="impact"><span class="guide-num" aria-hidden="true">3</span>
+            <span><strong>See the what-if</strong><span class="guide-sub">Pilgrims on the slide segment</span></span></button></li>
+        </ol>
+      </section>
+
+      <div class="tabs" role="tablist" aria-label="Console panels">
+        <button type="button" role="tab" id="tab-segment" data-tab="segment" aria-controls="segment-panel" aria-selected="false" tabindex="-1">Segment</button>
+        <button type="button" role="tab" id="tab-alerts" data-tab="alerts" aria-controls="alerts-panel" aria-selected="true">Alerts <span class="tab-badge" id="tab-alerts-count" hidden></span></button>
+        <button type="button" role="tab" id="tab-impact" data-tab="impact" aria-controls="impact-panel" aria-selected="false" tabindex="-1">What-if</button>
+        <button type="button" role="tab" id="tab-camera" data-tab="camera" aria-controls="camera-panel" aria-selected="false" tabindex="-1">Camera</button>
+      </div>
+
+      <section class="panel" id="segment-panel" role="tabpanel" aria-labelledby="tab-segment" hidden>
         <h2 id="segment-title">Segment</h2>
         <div id="segment-body" class="muted">Select a segment on the map or in the list.</div>
         <label class="seg-pick">Or pick: <select id="segment-select" aria-label="Select segment"></select></label>
       </section>
 
-      <section class="panel" id="alerts-panel" aria-labelledby="alerts-title">
+      <section class="panel" id="alerts-panel" role="tabpanel" aria-labelledby="tab-alerts">
         <div class="panel-head">
           <h2 id="alerts-title">Alerts</h2>
           <label class="officer">Acting as
@@ -85,7 +111,7 @@
         </details>
       </section>
 
-      <section class="panel" id="impact-panel" aria-labelledby="impact-title">
+      <section class="panel" id="impact-panel" role="tabpanel" aria-labelledby="tab-impact" hidden>
         <div class="panel-head">
           <h2 id="impact-title">What if the hold had been approved earlier?</h2>
           <label class="small">Rain model
@@ -100,7 +126,7 @@
         <div id="impact-body" aria-live="polite"><span class="muted small">Loading…</span></div>
       </section>
 
-      <section class="panel" id="camera-panel" aria-labelledby="camera-title">
+      <section class="panel" id="camera-panel" role="tabpanel" aria-labelledby="tab-camera" hidden>
         <h2 id="camera-title">AI crowd count</h2>
         <p class="sim-line"><span class="tag tag-demo">AI model output on a demo photo, not a Vaishno Devi camera</span></p>
         <div class="cam-controls">
