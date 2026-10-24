@@ -54,7 +54,7 @@ def counterfactual(topo: Topology, targets: list[str], event_ts: datetime, decis
     """Contract shape of GET /api/impact/counterfactual (docs/PLAN.md), always `simulated: true`.
 
     `hazard_at` = hazard levels per segment at each decision hour (same source). A decision without a time
-    (other than no action) or after the snapshot is omitted.
+    (other than no action), after the snapshot, or with no hold point at its hour (nothing to hold) is omitted.
     """
     snapshot = snapshot_hour(event_ts)
     scenarios = []
@@ -62,6 +62,8 @@ def counterfactual(topo: Topology, targets: list[str], event_ts: datetime, decis
         if d.key != "no_action" and (d.ts is None or d.ts > snapshot):
             continue
         holds = hold_points(topo, hazard_at.get(d.ts, {}), hp) if d.ts else None
+        if d.ts and not holds:
+            continue
         stop = {leaf: (sid, d.ts) for leaf, sid in holds.items()} if holds else None
         scenarios.append({"key": d.key, "label": d.label, "decision_ts": d.ts, "hold_points": holds,
                           "persons_on_target": persons_on_target(topo, targets, snapshot, params, stop)})

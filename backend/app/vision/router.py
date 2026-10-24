@@ -42,13 +42,18 @@ def vision_count(camera_id: str, persist: bool = False, image: UploadFile | None
         raise HTTPException(404, f"camera {camera_id} not found")
     if (image is None) == (sample is None):
         raise HTTPException(422, "send exactly one of: multipart field `image`, form field `sample`")
+    if persist and sample is not None:
+        raise HTTPException(422, "a demo photo is not a camera image and cannot be applied to the live crowd")
     if sample is not None:
         path = service.sample_path(sample)
         if path is None:
             raise HTTPException(404, f"sample {sample} not found")
         data = path.read_bytes()
     else:
-        data = image.file.read()
+        limit = int(infer.vision_config()["max_upload_bytes"])
+        data = image.file.read(limit + 1)
+        if len(data) > limit:
+            raise HTTPException(413, f"image is larger than {limit} bytes")
     try:
         img = infer.decode_image(data)
     except infer.UnreadableImage as e:

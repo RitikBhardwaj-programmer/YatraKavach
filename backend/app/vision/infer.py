@@ -80,13 +80,29 @@ def session():
     return _session
 
 
-def decode_image(data: bytes) -> Image.Image:
+_DECODE_ERRORS = (UnidentifiedImageError, OSError, ValueError, SyntaxError, Image.DecompressionBombError)
+
+
+def decode_image(data: bytes, max_pixels: int | None = None, min_side: int | None = None) -> Image.Image:
+    """Decode to RGB. The size is checked from the header before the pixels are loaded (memory guard).
+    Limits default to `vision.max_image_pixels` / `vision.min_side_px` in config/thresholds.yaml."""
+    cfg = vision_config()
+    max_pixels = int(max_pixels or cfg["max_image_pixels"])
+    min_side = int(min_side or cfg["min_side_px"])
     try:
         img = Image.open(io.BytesIO(data))
-        img.load()
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
+    except _DECODE_ERRORS as e:
         raise UnreadableImage(f"not a readable image: {e}") from e
-    return img.convert("RGB")
+    w, h = img.size
+    if w * h > max_pixels:
+        raise UnreadableImage(f"image is {w}x{h} px; the limit is {max_pixels} pixels")
+    if min(w, h) < min_side:
+        raise UnreadableImage(f"image is {w}x{h} px; the shorter side must be at least {min_side} px")
+    try:
+        img.load()
+        return img.convert("RGB")
+    except _DECODE_ERRORS as e:
+        raise UnreadableImage(f"not a readable image: {e}") from e
 
 
 def resize_max_side(img: Image.Image, max_side: int) -> Image.Image:

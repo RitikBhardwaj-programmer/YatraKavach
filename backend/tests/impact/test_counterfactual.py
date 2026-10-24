@@ -69,7 +69,8 @@ def result(topo):
     gate_orange = {"VD-TRUNK-01": 2, "VD-OLD-01": 2}
     decisions = [Decision("no_action", "No action", None), Decision("first_orange", "ORANGE", _h(25, 15)),
                  Decision("first_red", "RED", _h(26, 5)), Decision("official_closure", "~12:00", _h(26, 12)),
-                 Decision("too_late", "after the snapshot", _h(26, 15)), Decision("missing", "never", None)]
+                 Decision("too_late", "after the snapshot", _h(26, 15)), Decision("missing", "never", None),
+                 Decision("nothing_to_hold", "no hazard at that hour", _h(26, 9))]
     hazard_at = {_h(25, 15): gate_orange, _h(26, 5): gate_orange, _h(26, 12): {"VD-OLD-01": 3}}
     return counterfactual(topo, TARGET, EVENT, decisions, hazard_at, hp, SimParams())
 

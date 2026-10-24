@@ -2,7 +2,9 @@
 
 Format: MP4, at least 720p, max 80 MB. Screen recording of the console at `http://localhost:8000/` in REPLAY
 mode, with your face in a small corner box for the intro and the end. Record voice separately if the room is noisy.
-Before recording: run the replay (`POST /api/replay/run`), reload the console, close other tabs, zoom browser to 110%.
+Before recording: on a fresh database (`docker compose down -v`, then the README steps) run the replay with
+`?until=2025-08-26T14:00:00%2B05:30`, reload the console, close other tabs, zoom browser to 110%.
+Target length with the impact and camera parts: about 4:30.
 
 | Time | Screen | Voice (say it in your own words; ~130 words per minute) |
 |---|---|---|
@@ -12,8 +14,10 @@ Before recording: run the replay (`POST /api/replay/run`), reload the console, c
 | 1:25-2:10 | Slider to 25 Aug 15:00 → 26 Aug 05:00; click VD-OLD-01; show "Why" | "This is a replay of the real forecasts. 25 August, 3 pm: the old track turns orange. 26 August, 5 am: red — nine and a half hours before the slide. Click a segment and it says why: 24-hour rain, threshold, slope. With a second forecast model the lead is only one and a half hours, and I show that too, because coarse forecasts can't see single storms. That's why a human decides." |
 | 2:10-2:40 | Click VD-TRUNK-01: held queue, crowd ORANGE | "Closing a track isn't free. When the ascent stops, pilgrims queue below. In this simulated scenario the queue at Katra reaches 5.4 people per square metre — inside a segment that is itself red. So the system weighs hazard and people together." |
 | 2:40-3:25 | Alerts panel: RED alert; approve as Officer A (1 of 2); try again (refused); approve as Officer B → SENT; open CAP XML (Hindi/Urdu); audit trail + "verified" | "The system only proposes — one alert per track. Red needs two different officers. Officer A approves: one of two. The same officer can't approve twice. Officer B approves, and it goes out as a CAP alert — the standard format NDMA's SACHET uses — in English, Hindi and Urdu. Every step is in a hash-chained log nobody can edit. So afterwards, everyone can see who decided, and when." |
-| 3:25-3:45 | Slide: integrate, not replace + roadmap | "YatraKavach doesn't replace IMD, RFID or SACHET. It's the thin layer that joins them at the scale of one stretch. Next step: a one-monsoon pilot with the shrine board and SDRF, with radar and track rain gauges, to calibrate the thresholds." |
-| 3:45-4:00 | Face + repo URL + "Built with AI assistance — see README" | "It's open source. Thank you." |
+| 3:25-3:50 | Impact panel ("What if the hold had been approved earlier?"), GFS then ECMWF | "What does deciding earlier buy? In the simulated crowd, 674 pilgrims are on the slide segment at 2 pm with no action. Hold the ascent at the first orange warning, and it's zero — in every weather model; the cost is a long queue at the Katra gate. At the red warning it depends on the model: 93 with GFS, still 674 with ECMWF, because its red came at 1 pm. A hold at noon at the Katra gate comes too late for this segment: those people had already passed it." |
+| 3:50-4:10 | Camera panel: pick the Kumbh 2019 photo, show heatmap and count | "Crowd numbers can also come from cameras. This is a published AI crowd-counting model, running on a laptop CPU. On a festival photo — not a Vaishno Devi camera — it counts about 340 people and turns that into a density and a level. Its average error on test crowds is about 60 people per image." |
+| 4:10-4:25 | Slide: integrate, not replace + roadmap | "YatraKavach doesn't replace IMD, RFID, CCTV or SACHET. It's the thin layer that joins them at the scale of one stretch. Next: a one-monsoon pilot with the shrine board and SDRF." |
+| 4:25-4:35 | Face + repo URL + "Built with AI assistance — see README" | "It's open source. Thank you." |
 
 ## Recording checklist
 - [ ] 3:00-5:00 exactly; trim silence. 720p or higher; under 80 MB (OBS: 1280x720, 30 fps, ~2.5 Mbps ≈ 75 MB for 4 min).
@@ -23,4 +27,5 @@ Before recording: run the replay (`POST /api/replay/run`), reload the console, c
 
 ## 3-minute stall pitch (national round)
 Cut the video script to: 0:00-0:20 intro, the Adhkuwari event only (20 s), replay 05:00 RED + why (40 s),
-two-officer approval + CAP + audit (50 s), integrate-not-replace + pilot ask (30 s), close (10 s).
+two-officer approval + CAP + audit (40 s), impact panel 674 → 0 (20 s), integrate-not-replace + pilot ask (20 s),
+close (10 s).
