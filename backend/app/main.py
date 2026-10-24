@@ -18,7 +18,7 @@ def health():
 
 # Workstream routers: each package exposes `router` in router.py. Missing ones are skipped
 # so the app runs while workstreams are still in progress.
-for pkg in ("hazard", "risk", "alerts"):
+for pkg in ("hazard", "risk", "alerts", "impact", "vision"):
     try:
         app.include_router(importlib.import_module(f"app.{pkg}.router").router, prefix="/api")
     except ModuleNotFoundError as e:
