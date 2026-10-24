@@ -32,7 +32,9 @@ risk:
 vision:                          # camera crowd count (workstream V; docs/PLAN.md "Camera crowd count")
   model_file: model/dmcount_sha_fp16.onnx   # relative to backend/app/vision/; DM-Count (MIT), ShanghaiTech A weights
   model_sha256: null             # V fills this in after the export
+  model_label: null              # e.g. "DM-Count ShanghaiTech A (official weights), fp16"; written by the export script
   max_side_px: 1280              # images are resized so the longer side is at most this before inference
+  heatmap_alpha: 0.5             # display only: opacity of the density heatmap blended over the photo
   cameras:
     - id: CAM-KATRA-GATE
       segment_id: VD-TRUNK-01
