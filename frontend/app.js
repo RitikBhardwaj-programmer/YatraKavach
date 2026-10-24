@@ -17,6 +17,9 @@ const ALERTS_REFRESH_MS = 30 * 1000;
 const LEAD_SOURCES = [['gfs_seamless', 'GFS'], ['ecmwf_ifs025', 'ECMWF']];
 const HALF_HOUR_MS = 30 * 60000;
 const HEATMAP_OPACITY = 70; // % default for the heatmap overlay
+const TABS = ['segment', 'alerts', 'impact', 'camera'];
+const GUIDE_KEY = 'yk.guideHidden'; // per-viewer convenience only
+const NARROW = '(max-width: 900px)';
 
 const params = new URLSearchParams(location.search);
 const FIXTURES = params.get('fixtures') === '1';
@@ -29,7 +32,8 @@ const state = {
   map: null, mapReady: false, fitted: false,
   openDetails: new Set(), editing: null, loadToken: 0, historyToken: 0,
   liveTimer: null,
-  impact: new Map(), cameras: [], samples: [], cam: null, camToken: 0, camObjectUrl: null,
+  impact: new Map(), cameras: [], samples: [], cam: null, camToken: 0, camObjectUrl: null, camTimer: null, camFocus: null,
+  tab: TABS.includes(params.get('tab')) ? params.get('tab') : 'alerts', waiting: 0,
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -206,6 +210,75 @@ function officerName(id) {
   const o = state.officers.find((x) => x.id === id);
   return o ? o.name : id;
 }
+const SKELETON_LINES = (n) => `<div class="skel-lines" aria-hidden="true">${'<span class="skel"></span>'.repeat(n)}</div>`;
+// The API uses numeric alert ids, the fixtures use "A-0001"; show both readably.
+const alertName = (id) => (/^\d+$/.test(String(id)) ? `Alert #${id}` : String(id));
+
+/* ---------- tabs and demo guide ---------- */
+function showTab(name, focus) {
+  if (!TABS.includes(name)) return;
+  state.tab = name;
+  document.querySelectorAll('.tabs [role="tab"]').forEach((t) => {
+    const on = t.dataset.tab === name;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    $('#' + t.getAttribute('aria-controls')).hidden = !on;
+    if (on && focus) t.focus();
+  });
+}
+
+function onTabKey(e) {
+  const keys = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
+  if (!(e.key in keys)) return;
+  e.preventDefault();
+  const i = TABS.indexOf(state.tab);
+  const k = keys[e.key];
+  const next = k === 'first' ? 0 : k === 'last' ? TABS.length - 1 : (i + k + TABS.length) % TABS.length;
+  showTab(TABS[next], true);
+}
+
+function revealTabs() {
+  if (window.matchMedia(NARROW).matches) $('.tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function storageGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function storageSet(key, v) { try { localStorage.setItem(key, v); } catch { /* storage blocked: fine */ } }
+
+function renderGuide() {
+  // ?guide=1 brings the steps back after "Hide" (e.g. before recording the demo).
+  $('#guide').hidden = state.mode !== 'replay' || (storageGet(GUIDE_KEY) === '1' && params.get('guide') !== '1');
+}
+
+async function onGuideStep(step) {
+  if (step === 'replay') {
+    // Open the slide segment (the impact target), else the first RED one.
+    let id = null;
+    try { id = (await impactData(LEAD_SOURCES[0][0])).target_segments?.[0] || null; } catch { /* fall back */ }
+    id = id || state.fc?.features.find((f) => f.properties.risk_level === 3)?.properties.id;
+    if (id) selectSegment(id);
+    else $('#slider').focus();
+    return;
+  }
+  showTab(step, true);
+  revealTabs();
+}
+
+/* Situation card on the map: what the officer must see first. */
+function renderSituation() {
+  const el = $('#situation');
+  const feats = state.fc?.features || [];
+  if (!feats.length) { el.hidden = true; return; }
+  const counts = LEVELS.map((_, i) => feats.filter((f) => f.properties.risk_level === i).length);
+  const items = LEVELS.map((name, i) => [i, name]).reverse().filter(([i]) => counts[i])
+    .map(([i, name]) => `<li><span class="sit-sw lvl-${i}" aria-hidden="true"></span><strong>${counts[i]}</strong> ${name}</li>`).join('');
+  const ts = feats[0].properties.ts || currentAt();
+  el.hidden = false;
+  el.innerHTML = `<div class="sit-time">${state.mode === 'live' ? 'Live' : 'Replay'}${ts ? ' · ' + esc(fmtTs(ts)) : ''}</div>
+    <ul class="sit-counts">${items}</ul>
+    <div class="sit-total">of ${feats.length} track segments</div>
+    ${state.waiting ? `<button type="button" class="btn btn-primary btn-sm sit-go" data-goto="alerts">Review ${state.waiting} alert${state.waiting > 1 ? 's' : ''} awaiting approval</button>` : ''}`;
+}
+
 function flash(msg, isError) {
   const el = $('#flash') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'flash' });
   el.setAttribute('role', isError ? 'alert' : 'status');
@@ -355,6 +428,7 @@ async function loadSegments() {
     const ts = fc.features[0]?.properties.ts || currentAt();
     $('#data-time').textContent = `${state.mode === 'live' ? 'Live' : 'Replay'} data: ${ts ? fmtTs(ts) : 'time not given'}`;
     renderMap();
+    renderSituation();
     renderSegmentSelect();
     if (state.selected) renderSegment();
     if (state.mode === 'replay' && !state.editing) renderAlerts();
@@ -374,12 +448,12 @@ function renderSegmentSelect() {
   sel.value = cur;
 }
 
-function selectSegment(id) {
+function selectSegment(id, openTab = true) {
   state.selected = id || null;
   $('#segment-select').value = id || '';
   renderMap();
   renderSegment();
-  if (window.matchMedia('(max-width: 900px)').matches && id) $('#segment-panel').scrollIntoView({ behavior: 'smooth' });
+  if (openTab && id) { showTab('segment'); revealTabs(); }
 }
 
 function renderSegment() {
@@ -404,7 +478,7 @@ function renderSegment() {
     <p class="why"><strong>Why:</strong> ${why.length ? why.map(esc).join('; ') : 'no drivers given'}
       ${p.persons != null || d.persons != null ? (simCrowd ? ' ' + SIM : '') : ''}</p>
     ${d.rule ? `<p class="small">Rule: ${esc(ruleWords(d.rule))} <code>${esc(d.rule)}</code>${d.held_by_hysteresis ? ' · level held (hysteresis)' : ''}${d.rain_point ? ` · rain point ${esc(d.rain_point)}` : ''}${d.source ? ` (${esc(d.source)})` : ''}</p>` : ''}
-    <div class="chart" id="seg-chart" aria-live="polite"><span class="muted small">Loading history…</span></div>`;
+    <div class="chart" id="seg-chart" aria-live="polite" aria-busy="true"><span class="skel skel-chart" aria-hidden="true"></span><span class="sr-only">Loading history…</span></div>`;
   loadHistory(p);
 }
 
@@ -419,6 +493,7 @@ async function loadHistory(p) {
   } catch (e) {
     if (token === state.historyToken) $('#seg-chart').innerHTML = `<span class="muted small">History unavailable: ${esc(e.message)}</span>`;
   }
+  if (token === state.historyToken) $('#seg-chart')?.removeAttribute('aria-busy');
 }
 
 function historyChart(rows) {
@@ -525,6 +600,7 @@ function setMode(mode) {
   loadSegments();
   renderAlerts();
   renderCamResult();
+  renderGuide();
 }
 
 /* ---------- alerts ---------- */
@@ -567,6 +643,11 @@ function renderAlerts() {
   const closed = mine.filter((a) => !OPEN_STATES.includes(a.state)).sort(order);
   const waiting = open.filter((a) => ACTIONABLE.includes(a.state)).length;
   $('#kpi-alerts').textContent = `${open.length}${waiting ? ` · ${waiting} awaiting approval` : ''}`;
+  const badge = $('#tab-alerts-count');
+  badge.hidden = !open.length;
+  badge.textContent = String(open.length);
+  badge.title = `${open.length} open, ${waiting} awaiting approval`;
+  if (waiting !== state.waiting) { state.waiting = waiting; renderSituation(); }
   $('#alerts-list').innerHTML = open.length ? open.map(alertCard).join('')
     : `<p class="muted">No open alerts in ${state.mode.toUpperCase()} mode${at ? ' at this replay time' : ''}.</p>`;
   if (later) $('#alerts-list').insertAdjacentHTML('beforeend', `<p class="muted small">${later} alert${later > 1 ? 's' : ''} proposed after ${esc(fmtTs(at))} hidden; move the slider forward.</p>`);
@@ -590,8 +671,8 @@ function alertCard(a) {
   const approvals = (a.approvals || []).map((x) => `${esc(officerName(x.officer))} (${esc(fmtTs(x.ts, false))})`).join(', ') || 'none yet';
   const btn = (verb, label, enabled, title, cls = '') =>
     `<button type="button" class="btn ${cls}" data-verb="${verb}" data-id="${esc(a.id)}" ${enabled ? '' : 'disabled'} ${title ? `title="${esc(title)}"` : ''}>${label}</button>`;
-  return `<article class="alert lvl-edge-${a.level}" data-id="${esc(a.id)}" aria-label="Alert ${esc(a.id)}, ${LEVELS[a.level]}, ${esc(a.state)}">
-    <header class="alert-head">${pill(a.level)} <strong>${esc(a.id)}</strong>
+  return `<article class="alert lvl-edge-${a.level}" data-id="${esc(a.id)}" aria-label="${esc(alertName(a.id))}, ${LEVELS[a.level]}, ${esc(a.state)}">
+    <header class="alert-head">${pill(a.level)} <strong class="alert-id">${esc(alertName(a.id))}</strong>
       <span class="state state-${esc(a.state)}">${esc(a.state)}</span>
       ${a.example ? '<span class="tag tag-example">EXAMPLE</span>' : ''}</header>
     ${editing
@@ -645,7 +726,7 @@ async function onAlertClick(ev) {
   const a = state.alerts.find((x) => x.id === id);
   if (verb === 'show') {
     const ids = a.segment_ids || [];
-    selectSegment(ids[0]);
+    selectSegment(ids[0], false); // stay on the Alerts tab
     const fs = state.fc?.features.filter((f) => ids.includes(f.properties.id));
     if (state.mapReady && fs?.length) state.map.fitBounds(bounds(fs), { padding: 60 });
     return;
@@ -666,10 +747,10 @@ async function onAlertClick(ev) {
   }
   if (verb === 'break-glass') {
     if (!reason) { flash('Break-glass needs a written reason.', true); reasonEl?.focus(); return; }
-    if (!confirm(`Break-glass: send ${id} now as ${officer.name}, without the remaining approvals? This is logged.`)) return;
+    if (!confirm(`Break-glass: send ${alertName(id)} now as ${officer.name}, without the remaining approvals? This is logged.`)) return;
   }
-  if (verb === 'reject' && !confirm(`Reject ${id} as ${officer.name}?`)) return;
-  if (verb === 'cancel' && !confirm(`Cancel ${id} as ${officer.name}?`)) return;
+  if (verb === 'reject' && !confirm(`Reject ${alertName(id)} as ${officer.name}?`)) return;
+  if (verb === 'cancel' && !confirm(`Cancel ${alertName(id)} as ${officer.name}?`)) return;
   b.disabled = true;
   try {
     const updated = await api.action(id, apiVerb, body);
@@ -677,10 +758,10 @@ async function onAlertClick(ev) {
     if (verb === 'save') state.editing = null;
     renderAlerts();
     loadVerify();
-    flash(`${id}: ${verb === 'save' ? 'action edited' : verb} by ${officer.name} → ${updated.state}${FIXTURES ? ' (fixtures: local only, not saved)' : ''}`);
+    flash(`${alertName(id)}: ${verb === 'save' ? 'action edited' : verb} by ${officer.name} → ${updated.state}${FIXTURES ? ' (fixtures: local only, not saved)' : ''}`);
   } catch (e) {
     b.disabled = false;
-    flash(`${id}: ${e.message}`, true);
+    flash(`${alertName(id)}: ${e.message}`, true);
   }
 }
 
@@ -728,13 +809,15 @@ async function loadLeadTime() {
 async function loadImpact() {
   const body = $('#impact-body');
   const source = $('#impact-source').value;
-  body.innerHTML = '<span class="muted small">Loading…</span>';
+  body.setAttribute('aria-busy', 'true');
+  body.innerHTML = `${SKELETON_LINES(4)}<span class="sr-only">Loading scenarios…</span>`;
   try {
     const d = await impactData(source);
     if ($('#impact-source').value === source) body.innerHTML = impactHtml(d);
   } catch (e) {
     body.innerHTML = `<p class="muted small">Impact scenarios unavailable: ${esc(e.message)}</p>`;
   }
+  body.removeAttribute('aria-busy');
 }
 
 function impactHtml(d) {
@@ -804,10 +887,11 @@ async function runCount(persist) {
   const input = { src: file ? state.camObjectUrl : api.sampleUrl(sample),
     credit: file ? 'Your uploaded image (sent to this server for counting).'
       : (() => { const x = state.samples.find((s) => s.name === sample); return x ? 'Photo: ' + photoCredit(x) : ''; })() };
-  $('#cam-result').innerHTML = '<p class="muted small">Counting…</p>';
+  setCamBusy(true, input);
   try {
     const r = await api.count({ cameraId, persist, sample, file });
     if (token !== state.camToken) return;
+    setCamBusy(false);
     state.cam = { r, input };
     renderCamResult();
     if (persist) {
@@ -815,8 +899,37 @@ async function runCount(persist) {
       flash(`Camera count applied to the live crowd on ${r.segment_id}${FIXTURES ? ' (fixtures: not saved)' : ''}`);
     }
   } catch (e) {
-    if (token === state.camToken) $('#cam-result').innerHTML = `<p class="muted small">Count failed: ${esc(e.message)}</p>`;
+    if (token !== state.camToken) return;
+    setCamBusy(false);
+    $('#cam-result').innerHTML = `<p class="muted small">Count failed: ${esc(e.message)}</p>`;
   }
+}
+
+/* While the model runs (seconds on a CPU), show the input photo, a live timer, and lock the pickers. */
+function setCamBusy(on, input) {
+  const pickers = ['#cam-select', '#sample-select', '#cam-upload'].map((s) => $(s));
+  if (on) state.camFocus = pickers.includes(document.activeElement) ? document.activeElement : null;
+  $('#camera-panel').setAttribute('aria-busy', String(on));
+  pickers.forEach((el) => { el.disabled = on; });
+  clearInterval(state.camTimer);
+  if (!on) {
+    // Disabling a focused control drops focus to <body>; give it back to the picker the user was on.
+    if (state.camFocus && document.activeElement === document.body) state.camFocus.focus();
+    state.camFocus = null;
+    return;
+  }
+  const started = Date.now();
+  $('#cam-result').innerHTML = `<figure class="cam-fig">
+      <div class="cam-stack cam-busy"><img class="cam-orig" src="${esc(input.src)}" alt="Input image, being counted"></div>
+      <figcaption class="small muted">${input.credit}</figcaption>
+    </figure>
+    <p class="cam-progress"><span class="spinner" aria-hidden="true"></span>
+      Counting people with the AI model… <span id="cam-elapsed" aria-hidden="true">0 s</span></p>
+    ${SKELETON_LINES(3)}`;
+  state.camTimer = setInterval(() => {
+    const el = $('#cam-elapsed');
+    if (el) el.textContent = `${Math.floor((Date.now() - started) / 1000)} s`;
+  }, 1000);
 }
 
 function renderCamResult() {
@@ -855,7 +968,20 @@ async function boot() {
     document.title += ' (example data)';
   }
   renderLegend();
+  if (window.matchMedia(NARROW).matches) $('#legend').open = false; // keep the track visible on a phone
+  showTab(state.tab);
   initMap();
+  document.querySelectorAll('.tabs [role="tab"]').forEach((t) => t.addEventListener('click', () => { showTab(t.dataset.tab); revealTabs(); }));
+  $('.tabs').addEventListener('keydown', onTabKey);
+  $('#guide').addEventListener('click', (e) => {
+    const s = e.target.closest('.guide-step');
+    if (s) onGuideStep(s.dataset.step);
+  });
+  $('#guide-close').addEventListener('click', () => { storageSet(GUIDE_KEY, '1'); renderGuide(); $('#tab-' + state.tab).focus(); });
+  $('#situation').addEventListener('click', (e) => {
+    const g = e.target.closest('[data-goto]');
+    if (g) { showTab(g.dataset.goto, true); revealTabs(); }
+  });
   document.querySelectorAll('.mode button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('.mode').addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
