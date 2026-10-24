@@ -56,8 +56,13 @@ Risk fusion (B): risk = max(hazard, crowd); if hazard >= 2 and crowd >= 1, risk 
 
 ## Alert workflow (B)
 States: PROPOSED -> APPROVED -> SENT -> ACKED; PROPOSED -> REJECTED; PROPOSED -> ESCALATED (no action in
-10 min) -> APPROVED/REJECTED; any open state -> CANCELLED; SENT -> EXPIRED (after `expires_at`).
-- Auto-proposal when risk_level >= 2 on a segment with no open alert. Action text from templates:
+10 min) -> APPROVED/REJECTED; any open state -> CANCELLED; SENT/ACKED -> EXPIRED (after `expires_at`); PROPOSED/ESCALATED -> CANCELLED by
+the system (action WITHDRAW) when the risk condition cleared before anyone acted. Sending is SIMULATED and
+happens as soon as the approvals are complete.
+- Auto-proposal when risk_level >= 2 on a segment with no covering alert. An alert covers its segments from
+  its `trigger_ts` (risk time, so replay-safe) until their risk falls below the alert's own level. Contiguous
+  segments of one route at one level form one alert; a RED over an ORANGE references it (CAP Update if sent).
+  Action text from templates:
   ORANGE "Hold pilgrims at <upstream landmark>; stop ascent beyond <segment landmark>";
   RED "Clear segment <id> (<landmark>); move pilgrims to <nearest shelter>".
 - RED alerts need two approvals from two different officers. ORANGE needs one.
@@ -71,18 +76,20 @@ States: PROPOSED -> APPROVED -> SENT -> ACKED; PROPOSED -> REJECTED; PROPOSED ->
 
 ## HTTP API contract (all JSON unless stated; times ISO 8601 with +05:30)
 - `GET /api/health` -> `{"status":"ok"}`
-- `GET /api/segments?mode=live|replay&at=<ts>` -> GeoJSON FeatureCollection; each feature's properties =
+- `GET /api/segments?mode=live|replay&at=<ts>&source=<optional>` -> GeoJSON FeatureCollection; each feature's properties =
   segment columns + `hazard_level, crowd_level, risk_level, persons, density_ppm2, drivers, simulated_crowd`
 - `GET /api/replay/timeline` -> `{"start","end","step_minutes":60,"events":[{"ts","label"}]}`
-- `GET /api/segments/{id}/history?mode=&from=&to=` -> `[{"ts","hazard_level","crowd_level","risk_level","drivers"}]`
+- `GET /api/segments/{id}/history?mode=&from=&to=&source=<optional>` -> `[{"ts","hazard_level","crowd_level","risk_level","drivers"}]`
 - `GET /api/alerts?state=` -> list of alerts `{"id","segment_ids","level","proposed_action","state","created_at","updated_at","approvals":[{"officer","ts"}],"needs_approvals","mode"}`
+  (+ read-only extras: `source`, `trigger_ts`, `sent_at`, `expires_at`, `references_alert_id`, `delivery`)
 - `POST /api/alerts/{id}/approve|reject|cancel|ack` body `{"officer_id","reason"?}` -> the alert
 - `POST /api/alerts/{id}/break-glass` body `{"officer_id","reason"}` -> the alert
 - `PATCH /api/alerts/{id}` body `{"officer_id","proposed_action"}` (edit before approval) -> the alert
 - `GET /api/alerts/{id}/cap.xml` -> `application/cap+xml`
 - `GET /api/audit?alert_id=` -> rows; `GET /api/audit/verify` -> `{"ok":true,"rows":n}` or first broken row
 - `GET /api/officers` -> demo officers `[{"id","name","role"}]`
-- `POST /api/replay/run` -> recompute hazard + crowd + risk + alert proposals for the replay window
+- `POST /api/replay/run?source=gfs_seamless&until=<ts>` -> recompute hazard + crowd + risk for the replay window,
+  then walk alert proposals up to `until` (the replay clock; default: end of window). Idempotent.
 Example responses live in `docs/api-fixtures/*.json` so the console can be built before the backend.
 
 ## Verification (definition of done)
