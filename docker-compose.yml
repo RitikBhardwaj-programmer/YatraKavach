@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: yatrakavach
       POSTGRES_USER: yk
       POSTGRES_PASSWORD: yk_dev_only   # local demo only; never use in production
-    ports: ["5432:5432"]
+    ports: ["${YK_DB_PORT:-5432}:5432"]   # set YK_DB_PORT if a local PostgreSQL already uses 5432
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
@@ -16,10 +16,12 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://yk:yk_dev_only@db:5432/yatrakavach
-    ports: ["8000:8000"]
+      PYTHONPATH: /app                  # lets scripts/load_*.py import the app package inside the container
+    ports: ["${YK_API_PORT:-8000}:8000"]
     volumes:
       - ./data:/app/data:ro
       - ./config:/app/config:ro
       - ./frontend:/app/frontend:ro
+      - ./scripts:/app/scripts:ro
     depends_on:
       db: {condition: service_healthy}
