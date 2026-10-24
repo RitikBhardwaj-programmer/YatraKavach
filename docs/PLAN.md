@@ -138,8 +138,12 @@ happens as soon as the approvals are complete.
 - `GET /api/vision/samples` -> `[{"name","attribution","license","source_url"}]`; `GET /api/vision/samples/{name}` -> the image
 - `POST /api/vision/count?camera_id=&persist=false`, multipart field `image` or form field `sample=<name>` ->
   `{"camera_id","segment_id","count","density_ppm2","persons_on_segment","level","heatmap_png_b64","model","demo_image","ms","persisted"}`;
-  `demo_image` is true when a sample photo was used; unknown camera or sample -> 404, unreadable image -> 422,
-  model file missing or sha256 mismatch -> 503. `persist=true` (live mode) upserts the camera segment's
+  `demo_image` is true when a sample photo was used; unknown camera or sample -> 404, unreadable image, image
+  outside `vision.max_image_pixels` / `vision.min_side_px`, or `persist=true` with a sample -> 422 (a demo photo is
+  never written as a live crowd row); upload above `vision.max_upload_bytes` -> 413; model file missing or sha256
+  mismatch -> 503.
+- `GET /api/impact/counterfactual` errors: no replay hazard for the source -> 404; holding disabled or targets with
+  different slide times -> 409. A scenario with no hold point at its decision hour is omitted. `persist=true` (live mode) upserts the camera segment's
   current-hour `segment_crowd` row with `simulated=false`, `scenario={"source":"camera","camera_id"}`, then re-runs
   live risk for that hour.
 Example responses live in `docs/api-fixtures/*.json` so the console can be built before the backend.

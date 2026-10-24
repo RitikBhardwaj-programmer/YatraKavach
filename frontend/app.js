@@ -263,7 +263,7 @@ function driversText(p) {
   const dens = p.density_ppm2 ?? d.density_ppm2;
   if (persons != null) parts.push(`${num(persons, 0)} people${dens != null ? ` (${num(dens, 2)} per m²)` : ''}`);
   const sc = d.scenario || p.crowd_scenario;
-  if (sc?.source === 'camera') parts.push(`crowd from an AI camera count (${sc.camera_id || 'camera'}) on a demo photo`);
+  if (sc?.source === 'camera') parts.push(`crowd from an AI count of an uploaded image (${sc.camera_id || 'camera'}), applied in LIVE mode`);
   if (sc && sc.held_persons) {
     parts.push(sc.releasing
       ? `held queue of ${num(sc.held_persons, 0)} people moving on after the hold ended (SIMULATED scenario)`
@@ -841,9 +841,11 @@ function renderCamResult() {
       <dt>Level</dt><dd>${pill(r.level)}</dd>
       <dt>Model</dt><dd class="small">${esc(r.model)} · ${num(r.ms, 0)} ms</dd>
     </dl>
-    <div class="actions">${state.mode === 'live'
-      ? `<button type="button" class="btn btn-primary" id="cam-apply" title="Write this count into the live crowd for ${esc(r.segment_id)} and re-run live risk">Apply to live crowd</button>`
-      : '<span class="muted small">Switch to LIVE to apply a count to the live crowd.</span>'}</div>`;
+    <div class="actions">${state.mode !== 'live'
+      ? '<span class="muted small">Switch to LIVE to apply a count to the live crowd.</span>'
+      : r.demo_image
+        ? '<span class="muted small">A demo photo cannot be applied to the live crowd; upload a camera image.</span>'
+        : `<button type="button" class="btn btn-primary" id="cam-apply" title="Write this count into the live crowd for ${esc(r.segment_id)} and re-run live risk">Apply to live crowd</button>`}</div>`;
 }
 
 /* ---------- boot ---------- */

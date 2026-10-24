@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.vision import service
+from app.vision import infer, service
 
 client = TestClient(app)
 
@@ -57,13 +57,28 @@ def test_count_sample_with_db(model, db):
     assert body["demo_image"] is True and body["count"] >= 0 and 0 <= body["level"] <= 3
 
 
+def test_count_persist_refuses_a_demo_photo():
+    r = client.post("/api/vision/count", params={"camera_id": "CAM-KATRA-GATE", "persist": "true"},
+                    data={"sample": "any.jpg"})
+    assert r.status_code == 422 and "demo photo" in r.text
+
+
+def test_count_upload_above_byte_limit_413(monkeypatch):
+    cfg = {**infer.vision_config(), "max_upload_bytes": 10}
+    monkeypatch.setattr(infer, "vision_config", lambda: cfg)
+    r = client.post("/api/vision/count", params={"camera_id": "CAM-KATRA-GATE"},
+                    files={"image": ("x.jpg", b"0123456789A", "image/jpeg")})
+    assert r.status_code == 413
+
+
 def test_count_persist_writes_live_camera_row(model, db):
     names = [s["name"] for s in service.samples()]
     if not names:
         pytest.skip("no demo samples in backend/app/vision/samples yet")
     from app import db as appdb
+    upload = service.sample_path(names[0]).read_bytes()   # sent as an upload: only uploads may be persisted
     r = client.post("/api/vision/count", params={"camera_id": "CAM-KATRA-GATE", "persist": "true"},
-                    data={"sample": names[0]})
+                    files={"image": ("camera.jpg", upload, "image/jpeg")})
     assert r.status_code == 200, r.text
     with appdb.conn() as c:
         row = c.execute("""SELECT persons, level, simulated, scenario FROM segment_crowd

@@ -34,6 +34,9 @@ vision:                          # camera crowd count (workstream V; docs/PLAN.m
   model_sha256: ced22a602d35b697693276d6bb6464a4d4c96a539d082695534a2934456cb118  # written by scripts/export_dmcount_onnx.py
   model_label: "DM-Count ShanghaiTech A (official weights, model_sh_A.pth), fp16"  # written by the export script
   max_side_px: 1280              # images are resized so the longer side is at most this before inference
+  max_upload_bytes: 10000000     # uploads above this are refused (413) before decoding
+  max_image_pixels: 40000000     # images above this many pixels are refused (422) before decoding (memory guard)
+  min_side_px: 32                # images with a shorter side below this are refused (422); the model downsamples 8x
   heatmap_alpha: 0.5             # display only: opacity of the density heatmap blended over the photo
   cameras:
     - id: CAM-KATRA-GATE

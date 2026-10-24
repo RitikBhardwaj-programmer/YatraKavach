@@ -44,8 +44,10 @@ numbers; (b) the RED alert approved by two officers, CAP text in Hindi/Urdu, aud
 - Holding scenario: stopping the ascent fills Katra to 5.4 persons/m² inside a RED segment [measured, SIMULATED].
   "Closing a track moves the risk to the people below it."
 - Impact panel: "If the hold had been approved at the first ORANGE warning, 0 simulated pilgrims would have been on
-  the slide segment at 14:00, instead of 674" [measured, SIMULATED]. Acting when the track was actually closed
-  (~12:00) changes nothing in the model: the people there had already passed the gate.
+  the slide segment at 14:00, instead of 674" [measured, SIMULATED]; the cost is a queue at the Katra gate.
+  A hold at ~12:00 (when the track was closed) at the Katra gate is too late for this segment: the people there had
+  already passed the gate. The real closure was at Adhkuwari; modelled there, 236 descending pilgrims remain
+  [measured in PR 9, not in the API].
 
 ## Slide 5 — Impact, KPIs and scale
 **Visual:** KPI table (left), map of J&K yatra routes (right).
@@ -54,7 +56,7 @@ numbers; (b) the RED alert approved by two officers, CAP text in Hindi/Urdu, aud
 | Lead time of RED before a slide | 1.5-9.5 h on 26 Aug 2025 replay [measured] | ≥ 3 h with radar input |
 | Alerts with a named approver and timestamp | 100% [measured] | 100% |
 | Open alerts at peak (26 Aug, 14:00) | 6, one per track and level [measured] | ≤ 1 per track and level |
-| Pilgrims on the slide segment at 14:00 | 674 no action → 93 if held at GFS RED → 0 if held at first ORANGE [measured, SIMULATED] | decision within 1 h of ORANGE |
+| Pilgrims on the slide segment at 14:00 | 674 no action → 0 if held at first ORANGE (all 3 models); at first RED 93 (GFS) / 674 (ECMWF, ERA5) [measured, SIMULATED] | decision within 1 h of ORANGE |
 | Camera crowd count error | MAE 60 people/image on ShanghaiTech A [measured] | validated on SMVDSB CCTV |
 | Time from proposal to decision | logged per alert | median < 10 min |
 - Scale: same engine for Amarnath, Machail, Char Dham, Sabarimala — only segments and thresholds change.

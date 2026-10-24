@@ -12,7 +12,8 @@ IIT Bombay). Theme 11: Disaster Mitigation & Resilience. Team **kavach**, Jammu 
 > (GFS forecast), about 9.5 hours before the slide, and proposes "clear the old track" for officer approval.
 > With the ECMWF forecast the lead time is about 1.5 hours. Details: [docs/replay-findings.md](docs/replay-findings.md).
 > In a SIMULATED crowd, a hold approved at the first ORANGE warning leaves **0** pilgrims on that segment at 14:00,
-> in all three weather models; with no action there are **674**.
+> in all three weather models; with no action there are **674**. The cost of that hold is a long queue at the
+> Katra gate, which the system also models.
 
 ## The problem
 Three recent yatra disasters in J&K show the same break (sources in [docs/research.md](docs/research.md)):
@@ -47,9 +48,9 @@ from "regional alert" to **"close this 500 m stretch now, move the people on it,
 8. **Shows the cost of waiting** (SIMULATED): for each warning time, how many pilgrims would still have been on
    the slide segment if officers had approved the hold then (`GET /api/impact/counterfactual`).
 9. **Counts people from a camera image** with an AI model (DM-Count, run on CPU with ONNX Runtime). A camera
-   watches one segment; the count becomes a crowd density and level, and in LIVE mode an officer can apply it to
-   the live crowd instead of the simulated value. The demo uses openly licensed festival photos, not Vaishno Devi
-   cameras, and the console says so.
+   watches one segment; the count becomes a crowd density and level. In LIVE mode the count of an uploaded image
+   can be applied to the live crowd instead of the simulated value; demo photos cannot. The demo uses openly
+   licensed festival photos, not Vaishno Devi cameras, and the console says so.
 
 ## Architecture
 
@@ -157,8 +158,11 @@ database; database tests skip with a message when none is reachable. Use the por
   head counts. Only the ascent is stopped; pilgrims already above the hold keep walking.
 - **The camera count is a demo.** No Vaishno Devi camera feed was used. The ground area a camera sees
   (150 m²) is an assumed value, so the density from a demo photo is illustrative. The model's average error on
-  dense test crowds is about 60 people per image. One count takes 2-5 s on CPU. In LIVE mode the next simulated
-  crowd run can overwrite an applied camera count.
+  dense test crowds is about 60 people per image. The model takes 2-5 s per image on CPU; with the heatmap, a
+  request takes 3-8 s. Applying a count to the live crowd is not tied to a named officer or audited yet, and the
+  next simulated live crowd run can overwrite it. Uploads are limited to 10 MB and 40 megapixels.
+- **The ~12:00 closure is modelled as a hold at the Katra gate** (the system's hold point that hour), 6.3 km
+  below the slide, so it shows no effect at 14:00. The real closure was of the old track at Adhkuwari.
 - **No GSI susceptibility layer.** The GSI 1:50k map could not be obtained in time; slope is the stand-in.
 - **Delivery is SIMULATED.** No SMS, SACHET, cell broadcast or siren is triggered. CAP messages are `Exercise`.
 - **Hindi and Urdu texts need review by native speakers.** Dogri and Kashmiri are not done yet.

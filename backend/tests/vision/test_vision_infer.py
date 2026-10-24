@@ -57,6 +57,25 @@ def test_decode_image_rejects_garbage():
         infer.decode_image(b"not an image")
 
 
+def _png(w: int, h: int) -> bytes:
+    buf = io.BytesIO()
+    synthetic(w, h).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_decode_image_size_limits():
+    assert infer.decode_image(_png(320, 240)).size == (320, 240)
+    with pytest.raises(infer.UnreadableImage, match="limit"):
+        infer.decode_image(_png(320, 240), max_pixels=320 * 240 - 1)
+    with pytest.raises(infer.UnreadableImage, match="shorter side"):
+        infer.decode_image(_png(320, 20))
+
+
+def test_decode_image_limits_from_config():
+    cfg = infer.vision_config()
+    assert cfg["max_image_pixels"] > 1280 * 1280 and cfg["min_side_px"] >= 8 and cfg["max_upload_bytes"] > 0
+
+
 def test_sha256_mismatch_raises(tmp_path):
     f = tmp_path / "m.onnx"
     f.write_bytes(b"fake model bytes")
