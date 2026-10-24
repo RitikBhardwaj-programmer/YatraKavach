@@ -27,6 +27,14 @@ HTML + JS + MapLibre GL JS (no build step), served by FastAPI at `/`. MIT licenc
 | `backend/app/crowd/`, `backend/app/risk/`, `backend/app/alerts/`, `backend/tests/{crowd,risk,alerts}/`, `db/init/020-029_*.sql` | **B: crowd + alerts** |
 | `frontend/`, `docs/api-fixtures/` (read only for others) | **C: console** |
 
+Vision upgrade (24-25 Oct), one branch and PR each:
+| Path | Owner |
+|---|---|
+| `backend/app/vision/`, `backend/tests/vision/`, `scripts/export_dmcount_onnx.py`, `scripts/eval_vision.py`, `backend/requirements.txt`, the `vision:` block of `config/thresholds.yaml` | **V: vision** |
+| `backend/app/impact/`, `backend/tests/impact/`, `backend/app/crowd/simulator.py` (new optional `stop_ascent` parameter only), new test files in `backend/tests/crowd/` | **I: impact** |
+| `frontend/`, `docs/api-fixtures/` | **U: console 2** |
+| `docs/PLAN.md`, `backend/app/main.py`, `README.md`, `docs/replay-findings.md`, `docs/pitch/` | integration (main session) |
+
 Each workstream works on its own branch and opens its own PR. Never edit another workstream's paths.
 
 ## Database contract (`db/init/001_schema.sql`)
@@ -64,6 +72,20 @@ point (Katra gate, Banganga, Adhkuwari) below the first segment with hazard >= O
 reach the holding point join a queue there (capped at `max_held_persons`: registrations assumed suspended);
 after the hold ends the queue moves on at `release_per_hour`. This shows the second-order risk: closing a track
 crowds the people below it. The base flow above a hold is not reduced (exposure there is overstated).
+
+Impact counterfactual (I, SIMULATED): "how many pilgrims would have been on the slide segment if the hold had
+been approved at time T". `simulate(..., stop_ascent={leaf: (hold_segment_id, from_ts)})`: an ascending pilgrim
+on that leaf route who reaches the start of the hold segment at or after `from_ts` stays there (not counted
+above it, no descent). `stop_ascent=None` gives exactly the current output. Targets = segments with
+`past_slide_at`; event = their `past_slide_at`; snapshot = last whole hour at or before the event. Hold points
+per leaf route come from `hold_points()` with the hazard at the decision hour. Scenarios: `no_action`,
+`first_orange` and `first_red` (first hour the target reaches ORANGE / RED in `segment_hazard` for the source),
+`official_closure` (the replay timeline event "~12:00 shrine board says old track closed", approximate).
+
+Camera crowd count (V): DM-Count (MIT) exported to ONNX, run with onnxruntime on CPU. A camera
+(`vision.cameras`) watches one segment and sees `view_area_m2` of it (ASSUMED, demo value).
+density = count / view_area_m2; persons_on_segment = density x length_m x width_m; level from `crowd.bands_ppm2`.
+Demo photos are openly licensed crowd photos, not Vaishno Devi cameras, and the UI says so.
 
 ## Alert workflow (B)
 States: PROPOSED -> APPROVED -> SENT -> ACKED; PROPOSED -> REJECTED; PROPOSED -> ESCALATED (no action in
@@ -107,6 +129,17 @@ happens as soon as the approvals are complete.
 - `GET /api/officers` -> demo officers `[{"id","name","role"}]`
 - `POST /api/replay/run?source=gfs_seamless&until=<ts>` -> recompute hazard + crowd + risk for the replay window,
   then walk alert proposals up to `until` (the replay clock; default: end of window). Idempotent.
+- `GET /api/impact/counterfactual?source=gfs_seamless` -> `{"simulated":true,"target_segments":[...],"event_ts","snapshot_ts",
+  "scenarios":[{"key","label","decision_ts","hold_points":{"<leaf route>":"<segment id>"},"persons_on_target"}]}`
+  (`decision_ts` and `hold_points` are null for `no_action`; a scenario whose decision time is missing or after the
+  snapshot is omitted)
+- `GET /api/vision/cameras` -> `[{"id","segment_id","view_area_m2","label","assumed":true}]`
+- `GET /api/vision/samples` -> `[{"name","attribution","license","source_url"}]`; `GET /api/vision/samples/{name}` -> the image
+- `POST /api/vision/count?camera_id=&persist=false`, multipart field `image` or form field `sample=<name>` ->
+  `{"camera_id","segment_id","count","density_ppm2","persons_on_segment","level","heatmap_png_b64","model","demo_image","ms"}`;
+  unknown camera or sample -> 404, unreadable image -> 422. `persist=true` (live mode) upserts the camera segment's
+  current-hour `segment_crowd` row with `simulated=false`, `scenario={"source":"camera","camera_id"}`, then re-runs
+  live risk for that hour.
 Example responses live in `docs/api-fixtures/*.json` so the console can be built before the backend.
 
 ## Verification (definition of done)
