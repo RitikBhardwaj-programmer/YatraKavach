@@ -1,0 +1,99 @@
+1
+00:00:00,000 --> 00:00:25,000
+[INTRO GAP 0:00-0:25: team intro, your face and voice]
+
+2
+00:00:25,000 --> 00:00:55,000
+[Problem: three dated events, 2022-2025]
+
+3
+00:00:55,000 --> 00:01:04,000
+Officer console · the tracks are cut into 35 segments of about 500 m: Katra–Adhkuwari trunk, old track, Himkoti track
+
+4
+00:01:04,000 --> 00:01:13,000
+Every hour each segment gets a hazard level from rain over 3 h, 24 h and 15 days (published Himalayan thresholds), plus slope
+
+5
+00:01:13,000 --> 00:01:20,009
+Everything shown is open data; crowd numbers are SIMULATED and labelled so
+
+6
+00:01:20,010 --> 00:01:29,010
+Replay of the archived GFS forecasts · moving the slider back to 25 Aug 2025, 15:00 IST
+
+7
+00:01:29,010 --> 00:01:39,010
+25 Aug, 15:00 IST: Adhkuwari segment VD-OLD-01 (old track) turns ORANGE
+
+8
+00:01:39,010 --> 00:01:48,010
+26 Aug, 05:00 IST: VD-OLD-01 turns RED, about 9.5 hours before the 14:40 slide
+
+9
+00:01:48,010 --> 00:01:57,010
+“Why”: 24 h rain against the threshold, slope; the history strip shows how the level rose
+
+10
+00:01:57,010 --> 00:02:05,013
+With the ECMWF forecast the first RED comes only ~1.5 h before (top bar): coarse models miss single storms, so a human decides
+
+11
+00:02:05,013 --> 00:02:16,013
+26 Aug, 07:00 IST · VD-TRUNK-01 at the Katra gate: the ascent is stopped and pilgrims queue below (SIMULATED holding-area scenario)
+
+12
+00:02:16,013 --> 00:02:30,020
+About 5.4 people per m² (crowd ORANGE) inside a segment that is itself RED: the system weighs hazard and people together
+
+13
+00:02:30,020 --> 00:02:38,020
+Alerts tab · the system only proposes, one alert per track; RED needs two different officers
+
+14
+00:02:38,020 --> 00:02:45,020
+Demo Officer A approves the RED “clear the old track” alert: 1 of 2
+
+15
+00:02:45,020 --> 00:02:52,020
+The same officer cannot approve twice: Approve is now blocked for Officer A
+
+16
+00:02:52,020 --> 00:03:01,020
+Demo Officer B approves → SENT as a CAP 1.2 alert, the format NDMA SACHET uses (delivery SIMULATED)
+
+17
+00:03:01,020 --> 00:03:11,020
+CAP XML in English, Hindi and Urdu, status = Exercise
+
+18
+00:03:11,020 --> 00:03:20,021
+Every step is written to a hash-chained audit log nobody can edit · “Audit chain verified” in the top bar
+
+19
+00:03:20,021 --> 00:03:32,021
+What-if (SIMULATED crowd): pilgrims on the slide segment at 14:00 · no action 674 · hold at first ORANGE 0 · at first RED 93 (GFS)
+
+20
+00:03:32,021 --> 00:03:41,021
+ECMWF: hold at first ORANGE is still 0 (in every model); its RED came at 13:00, so a hold then leaves 674
+
+21
+00:03:41,021 --> 00:03:50,028
+A hold at about 12:00 at the Katra gate comes too late for this segment: those pilgrims had already passed it
+
+22
+00:03:50,028 --> 00:04:01,028
+Camera tab · crowd numbers can also come from cameras: a published AI crowd-counting model (DM-Count) on a CPU
+
+23
+00:04:01,028 --> 00:04:14,033
+Festival photo, not a Vaishno Devi camera: 340 people counted → density → level · average error about 60 people per image
+
+24
+00:04:14,033 --> 00:04:29,033
+[Integrate, not replace · next: one-monsoon pilot with SMVDSB and SDRF]
+
+25
+00:04:29,033 --> 00:04:44,033
+[Open source · built with AI assistance · data credits]
