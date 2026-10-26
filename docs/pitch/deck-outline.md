@@ -78,7 +78,7 @@ numbers; (b) the RED alert approved by two officers, CAP text in Hindi/Urdu, aud
 - Stakeholder feedback: [add the SDRF / district / shrine-board conversation if you get one — it is the
   strongest single addition, per the 2026 winners pattern].
 - AI disclosure: built with Claude Code (Anthropic, Claude Opus 5.5) as coding and research agent. AI generated
-  ~85-90% of code and documents under the team's direction; the team chose the problem, set requirements,
+  ~60-65% of code and documents under the team's direction; the team chose the problem, set requirements,
   approved every design and fix, and validated results [confirm the share].
 - Repo: github.com/RitikBhardwaj-programmer/YatraKavach (make it public before submitting).
 
