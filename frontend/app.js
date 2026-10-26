@@ -723,7 +723,8 @@ async function onAlertClick(ev) {
   if (!b) return;
   const id = b.dataset.id, verb = b.dataset.verb;
   const card = b.closest('.alert');
-  const a = state.alerts.find((x) => x.id === id);
+  // data-id is a string; the API's alert ids are numbers (the fixtures use strings).
+  const a = state.alerts.find((x) => String(x.id) === id);
   if (verb === 'show') {
     const ids = a.segment_ids || [];
     selectSegment(ids[0], false); // stay on the Alerts tab
@@ -754,7 +755,7 @@ async function onAlertClick(ev) {
   b.disabled = true;
   try {
     const updated = await api.action(id, apiVerb, body);
-    state.alerts = state.alerts.map((x) => (x.id === id ? updated : x));
+    state.alerts = state.alerts.map((x) => (String(x.id) === id ? updated : x));
     if (verb === 'save') state.editing = null;
     renderAlerts();
     loadVerify();
