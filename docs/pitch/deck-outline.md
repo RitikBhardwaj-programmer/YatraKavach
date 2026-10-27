@@ -1,5 +1,7 @@
 # Deck outline: YatraKavach (HSC 2027, 7 slides)
 
+> Superseded for layout (2026-10-27): the submitted deck follows the HSC template v7.0 slide order (Cover, Problem – Proposed Solution, Technical Approach, Impact Potential, Feasibility and Risk Analysis, Team, References); see `build_deck.js`. The content below is the source it was condensed from.
+
 Format: the IIT Bombay template from the portal's submission page, PPT or PDF, max 10 MB.
 File name: `JK_kavach_Deck.pdf`. Order required by the guidelines: problem (1-2), solution (3-4),
 impact and scale (5), team and implementation with AI disclosure (6-7).
